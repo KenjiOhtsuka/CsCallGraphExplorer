@@ -37,18 +37,20 @@
 └─────────────────────────────────────────────────┘
 ```
 
-Currently the architecture is simpler: `CsCallGraph.Cli` directly references `CsCallGraph.Core` and invokes it synchronously via console commands. The VS Code extension + LSP server layers are future work.
+The CLI, LSP server, and VS Code extension are all implemented and wired.
 
-## Extension Layer (TypeScript) — ❌ Not started
+## Extension Layer (TypeScript) — ✅ Done
 
 - **Activation**: `onLanguage:csharp` + `onCommand:csCallGraph.showCallers`
 - **Commands**: Registers `csCallGraph.showCallers` and `csCallGraph.showCallees`
-- **Tree View**: Implements `TreeDataProvider` for the side panel; lazy-loads children on expand
-- **LSP Client**: Connects to the Roslyn language server; sends `textDocument/callHierarchy` requests
+- **Call Hierarchy Provider**: Implements VS Code's native `CallHierarchyProvider` via LSP client
+- **LSP Client**: Connects to the standalone Roslyn language server; sends `textDocument/callHierarchy` requests
+- **Output Panel**: Fallback commands for tree view in output panel
+- **Known gaps**: `maxDepth`/`searchScope` settings declared in `package.json` but not yet wired to server; LSP frame header uses UTF-16 string length instead of UTF-8 byte count (breaks on non-ASCII)
 
 ## Analysis Layer (C# / Roslyn) — ✅ Core complete
 
-- **Language Server**: A .NET console application using StreamJsonRpc or built-in LSP libraries → ❌ Not started
+- **Language Server**: A .NET console application with manual JSON-RPC framing (Content-Length headers) → ✅ Implemented in `CsCallGraph.LanguageServer`
 - **Workspace Manager**: Opens the solution or project; creates a `Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace` or `AdhocWorkspace` → ✅ Implemented in `CallGraphEngine.OpenSolutionAsync`
 - **Call Graph Engine**: Core analysis logic (see [roslyn-integration.md](roslyn-integration.md)) → ✅ Implemented
 - **Cache**: In-memory solution, workspace, and compilation caches → ✅ Implemented. LRU result cache keyed by `(documentUri, symbolId, direction)` with TTL → ❌ Not started (planned for large-solution support)
@@ -84,3 +86,13 @@ We follow the [LSP 3.16 Call Hierarchy](https://microsoft.github.io/language-ser
 | `textDocument/prepareCallHierarchy` | - | Given a position, return the symbol at that location |
 | `callHierarchy/incomingCalls` | Callers | Who calls this symbol? |
 | `callHierarchy/outgoingCalls` | Callees | Whom does this symbol call? |
+
+## Known LSP Implementation Gaps
+
+| # | File | Issue | Impact |
+|---|------|-------|--------|
+| 1 | `LspModels.cs` | `JsonRpcId` lacks `JsonConverter`; numeric IDs serialize as objects `{"id":{}}` instead of `{"id":1}` | Server cannot deserialize client `id` fields; response IDs are non-conformant |
+| 2 | `LspModels.cs` | `TextDocumentSync` advertises `Full` (1) but server ignores `didOpen`/`didChange` | Client may send unnecessary document sync traffic |
+| 3 | `extension.ts` | `Content-Length` uses UTF-16 `string.length` instead of UTF-8 byte count | Breaks on non-ASCII characters split across TCP chunks |
+| 4 | `extension.ts` | `csCallGraph.maxDepth` and `csCallGraph.searchScope` settings declared but never sent to server | Settings have no effect |
+| 5 | `CallHierarchyHandler.cs` | `ToLspItem`/`ToIncomingCall`/`ToOutgoingCall` range fields may mix declaration and call-site positions | VS Code may display incorrect locations |

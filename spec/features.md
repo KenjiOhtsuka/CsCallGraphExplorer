@@ -93,3 +93,19 @@ Depth-limited transitive closure via `--depth` option. Default depth is 10, `--d
 
 - Track method group conversions, event subscriptions, and `Invoke` patterns
 - Best-effort: Roslyn cannot resolve all delegate targets statically
+
+## Known Gaps & Deferred Issues (from PR #3 CodeRabbit Review)
+
+Items acknowledged as valid but deferred for later resolution:
+
+| # | Area | Issue | Severity | Status |
+|---|------|-------|----------|--------|
+| 1 | **LspModels.cs** | `JsonRpcId` serializes as object instead of JSON primitive; server cannot deserialize numeric `id` fields from client | Critical | Deferred |
+| 2 | **LSP extension.ts** | `Content-Length` computed via UTF-16 `string.length` instead of UTF-8 byte count; breaks on non-ASCII messages | Major | Deferred |
+| 3 | **CalleesQuery.cs** | Constructor initializer calls (`: this(...)`, `: base(...)`) not recorded in callee graph | Major | Deferred |
+| 4 | **VS Code settings** | `csCallGraph.maxDepth` and `csCallGraph.searchScope` declared in `package.json` but not wired to LSP server | Major | Deferred |
+| 5 | **TESTING.md** | LSP frame examples have incorrect `Content-Length` byte counts | Major | Deferred |
+| 6 | **TESTING.md** | Troubleshooting refers to `pnpm compile` instead of `npm run compile` | Minor | Deferred |
+| 7 | **LspModels.cs** | Advertises `TextDocumentSync.Full` (1) but server does not consume `didOpen`/`didChange` events; should be `None` (0) | Minor | Deferred |
+| 8 | **CallGraphEngine.cs** | Cache `Lazy<Task<...>>` factory captures caller's `CancellationToken`; on cancellation/retry, entry not evicted | Minor | Deferred |
+| 9 | **CallHierarchyHandler.cs** | `ToLspItem`/`ToIncomingCall`/`ToOutgoingCall` range/selectionRange correctness for declaration vs call-site positions | Minor | Deferred |

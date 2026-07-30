@@ -122,7 +122,7 @@ The `--symbol` option accepts a fully-qualified symbol name.
 ### Resolution Rules (MVP)
 
 1. **Exact match only** — the name must match a symbol's full metadata name (namespace + type + member) exactly.
-2. **Overloads** — if the name matches multiple overloads, the CLI returns an `AMBIGUOUS_SYMBOL` error (⚠️ currently returns `SYMBOL_NOT_FOUND` — ambiguous resolution is a known gap). The user must disambiguate by including the parameter list in parentheses.
+2. **Overloads** — if the name matches multiple overloads, the CLI returns an `AMBIGUOUS_SYMBOL` error. The user must disambiguate by including the parameter list in parentheses.
 3. **Parameter list syntax** — to disambiguate overloads, append the parameter types:
    - `Foo.Bar.Method(int, string)`
    - `Foo.Bar.Method()`

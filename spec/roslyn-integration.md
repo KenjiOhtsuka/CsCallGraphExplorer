@@ -74,6 +74,7 @@ For each `InvocationExpressionSyntax`:
 
 Currently detects:
 - ✅ **Object creation**: `ObjectCreationExpressionSyntax` → constructor symbol
+- ❌ **Constructor initializer**: `: this(...)` and `: base(...)` chaining (`ConstructorInitializerSyntax`) not yet recorded in the callee graph
 - ✅ **Property access**: `MemberAccessExpressionSyntax` where the target is a property → property symbol
 - ✅ **Indexer access**: `ElementAccessExpressionSyntax` → indexer symbol
 - ❌ **Operator invocations**: `BinaryExpressionSyntax` / `PrefixUnaryExpressionSyntax` with custom operator overloads
@@ -101,12 +102,14 @@ Populate once when workspace is opened. Incrementally update on file save.
 
 **Memory estimate**: For a solution with 500K symbols and 2M call edges, roughly 200-400 MB for the index. Acceptable for typical enterprise solutions.
 
-#### 2. Compilation/Solution Cache — ✅ Implemented
+#### 2. Compilation/Solution Cache — ✅ Implemented (with known gap)
 
 The engine caches:
 - `MSBuildWorkspace` instance per solution path (avoids re-parsing `.sln`/`.csproj` files)
 - `Compilation` per project (avoids re-compiling)
 - `Solution` snapshot per path
+
+**Known gap**: `Lazy<Task<...>>` cache factory captures the caller's `CancellationToken`. If that token is cancelled, the cache entry is not evicted, so a subsequent caller might await a cancelled task. Fix: use a non-cancelable factory internally, then apply the caller's token only when awaiting.
 
 #### 3. Project-Level Scoping — ✅ Implemented
 

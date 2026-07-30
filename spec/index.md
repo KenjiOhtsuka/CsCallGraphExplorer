@@ -1,8 +1,6 @@
 # CsCallGraphExplorer
 
-> **Status: CLI MVP complete.** Core analysis engine (`CsCallGraph.Core`) and CLI tool (`CsCallGraph.Cli`) are implemented. LSP server and VS Code extension are planned for future phases.
-
-A call-hierarchy exploration tool for C# using Roslyn analysis. Delivered first as a CLI, with a VS Code extension planned for later.
+> **Status: All layers implemented.** Core analysis engine (`CsCallGraph.Core`), CLI tool (`CsCallGraph.Cli`), standalone LSP server (`CsCallGraph.LanguageServer`), and VS Code extension (`extensions/vscode/`) are implemented and wired together.
 
 ## Problem Statement
 
@@ -20,8 +18,8 @@ Visual Studio Enterprise provides a "Call Hierarchy" feature that allows develop
 - ✅ Scoped to user-code symbols only (not framework)
 
 ### 📅 Planned (Phase 2+)
-- 🏗️ VS Code extension scaffolded in `extensions/vscode/` — structure, commands, webview panel
-- ⏳ LSP server for incremental analysis
+- ✅ VS Code extension wired to LSP server — call hierarchy provider, output-panel commands
+- ✅ LSP server for incremental analysis — standalone process, stdin/stdout JSON-RPC
 - ⏳ Precomputed index for large-solution performance
 - ⏳ Clipboard copy (tree, branch, single node)
 - ⏳ Fuzzy symbol search
@@ -41,7 +39,7 @@ Visual Studio Enterprise provides a "Call Hierarchy" feature that allows develop
 | Language | C# | Roslyn is the de facto C# compiler platform |
 | Analysis backend | Roslyn Workspaces (Microsoft.CodeAnalysis.Workspaces) | Same infrastructure used by Visual Studio and C# Dev Kit |
 | Extension host | VS Code extension API (TypeScript) | VS Code extensions are written in TS/JS |
-| IPC | Language Server Protocol (LSP) via custom language server | Or reuse C# Dev Kit's Roslyn host; TBD |
+| IPC | Language Server Protocol (LSP) via custom language server | Standalone LSP server implemented; C# Dev Kit reuse deferred |
 | Caching | LRU cache + precomputed symbol-level index | Minimize repeated full-solution analysis |
 | UI | TreeViewProvider in VS Code | Native VS Code tree widget supports lazy loading |
 

@@ -19,11 +19,11 @@ CsCallGraphExplorer/
 │   │   └── Output/
 │   │       ├── TreeFormatter.cs        # Plain-text tree output  ✅
 │   │       └── JsonFormatter.cs        # JSON output             ✅
-│   ├── CsCallGraph.LanguageServer/     # LSP server              ❌ Not started
+│   ├── CsCallGraph.LanguageServer/     # LSP server              ✅ Done
 ├── extensions/
-│   └── vscode/                         # VS Code extension       🏗️ Scaffolded
+│   └── vscode/                         # VS Code extension       ✅ Done
 ├── tests/
-│   ├── CsCallGraph.Core.Tests/         # xUnit tests             ⏳ Scaffolded, no tests yet
+│   ├── CsCallGraph.Core.Tests/         # xUnit tests             ✅ 44 tests
 │   └── CsCallGraph.Cli.Tests/          # CLI process tests       ❌ Not started
 ├── samples/
 │   ├── SampleProject.sln               # Standalone solution     ✅
