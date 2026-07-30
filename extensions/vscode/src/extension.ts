@@ -114,7 +114,7 @@ interface LspIncomingCall {
 
 interface LspOutgoingCall {
   to: LspCallHierarchyItem;
-  toRanges: Range[];
+  fromRanges: Range[];
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +238,7 @@ class LspCallHierarchyProvider implements vscode.CallHierarchyProvider {
     const result: LspOutgoingCall[] = await this._client.request('callHierarchy/outgoingCalls', params);
     return (result ?? []).map((r) => new vscode.CallHierarchyOutgoingCall(
       fromLspItem(r.to),
-      (r.toRanges ?? []).map((rr) => toVscodeRange(rr))
+      (r.fromRanges ?? []).map((rr) => toVscodeRange(rr))
     ));
   }
 }
@@ -381,7 +381,7 @@ async function showInOutputPanel(
   channel.appendLine('');
   for (const call of calls ?? []) {
     const child = call.from ?? call.to;
-    const ranges = call.fromRanges ?? call.toRanges ?? [];
+    const ranges = call.fromRanges ?? [];
     const loc = ranges.length > 0
       ? `  at ${ranges[0].start.line + 1}:${ranges[0].start.character + 1}`
       : '';

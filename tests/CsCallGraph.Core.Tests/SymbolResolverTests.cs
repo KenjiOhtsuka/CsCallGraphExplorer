@@ -211,6 +211,7 @@ public class SymbolResolverTests
     [Fact]
     public void FindType_Nonexistent_ReturnsNull()
     {
+        Assert.NotEmpty(_fixture.Compilations);
         foreach (var comp in _fixture.Compilations)
         {
             var type = SymbolResolver.FindType(comp, "SampleLibrary.NonexistentType");
@@ -225,6 +226,7 @@ public class SymbolResolverTests
     [Fact]
     public void FindMembersByName_ExistingMember_ReturnsSymbols()
     {
+        Assert.NotEmpty(_fixture.Compilations);
         foreach (var comp in _fixture.Compilations)
         {
             var type = SymbolResolver.FindType(comp, "SampleLibrary.PublicMethods");
@@ -236,11 +238,13 @@ public class SymbolResolverTests
                 return;
             }
         }
+        Assert.Fail("Expected type not found in any compilation");
     }
 
     [Fact]
     public void FindMembersByName_OverloadedMethod_ReturnsAllOverloads()
     {
+        Assert.NotEmpty(_fixture.Compilations);
         foreach (var comp in _fixture.Compilations)
         {
             var type = SymbolResolver.FindType(comp, "SampleLibrary.Overloads");
@@ -252,11 +256,13 @@ public class SymbolResolverTests
                 return;
             }
         }
+        Assert.Fail("Expected type not found in any compilation");
     }
 
     [Fact]
     public void FindMembersByName_NonexistentMember_ReturnsEmpty()
     {
+        Assert.NotEmpty(_fixture.Compilations);
         foreach (var comp in _fixture.Compilations)
         {
             var type = SymbolResolver.FindType(comp, "SampleLibrary.PublicMethods");
@@ -267,6 +273,7 @@ public class SymbolResolverTests
                 return;
             }
         }
+        Assert.Fail("Expected type not found in any compilation");
     }
 
     #endregion
@@ -276,6 +283,7 @@ public class SymbolResolverTests
     [Fact]
     public void FindMethodByParams_EmptyParams_MatchesParameterless()
     {
+        Assert.NotEmpty(_fixture.Compilations);
         foreach (var comp in _fixture.Compilations)
         {
             var type = SymbolResolver.FindType(comp, "SampleLibrary.Overloads");
@@ -288,11 +296,13 @@ public class SymbolResolverTests
                 return;
             }
         }
+        Assert.Fail("Expected type not found in any compilation");
     }
 
     [Fact]
     public void FindMethodByParams_IntParam_MatchesSingleInt()
     {
+        Assert.NotEmpty(_fixture.Compilations);
         foreach (var comp in _fixture.Compilations)
         {
             var type = SymbolResolver.FindType(comp, "SampleLibrary.Overloads");
@@ -306,11 +316,13 @@ public class SymbolResolverTests
                 return;
             }
         }
+        Assert.Fail("Expected type not found in any compilation");
     }
 
     [Fact]
     public void FindMethodByParams_IntStringParams_MatchesCorrectOverload()
     {
+        Assert.NotEmpty(_fixture.Compilations);
         foreach (var comp in _fixture.Compilations)
         {
             var type = SymbolResolver.FindType(comp, "SampleLibrary.Overloads");
@@ -323,6 +335,7 @@ public class SymbolResolverTests
                 return;
             }
         }
+        Assert.Fail("Expected type not found in any compilation");
     }
 
     [Fact]

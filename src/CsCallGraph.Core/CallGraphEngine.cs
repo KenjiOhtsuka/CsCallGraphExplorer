@@ -440,7 +440,7 @@ public class CallGraphEngine : IDisposable
             {
                 switch (sub)
                 {
-                    case IMethodSymbol m when m.MethodKind is MethodKind.Ordinary or MethodKind.Constructor:
+                    case IMethodSymbol m when m.MethodKind is MethodKind.Ordinary or MethodKind.Constructor or MethodKind.StaticConstructor:
                         results.Add($"{type.ToDisplayString()}.{sub.Name}");
                         break;
                     case IPropertySymbol:

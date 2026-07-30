@@ -122,15 +122,33 @@ public static class SymbolResolver
             bool match = true;
             for (int i = 0; i < paramTypes.Length; i++)
             {
+                // Strip ref/out modifier from the expected parameter spec for type comparison
+                var expectedType = paramTypes[i];
+                var isRefExpected = expectedType.StartsWith("ref ", StringComparison.OrdinalIgnoreCase);
+                var isOutExpected = expectedType.StartsWith("out ", StringComparison.OrdinalIgnoreCase);
+                if (isRefExpected || isOutExpected)
+                    expectedType = expectedType[4..];
+
                 var pType = m.Parameters[i].Type.ToDisplayString();
-                if (!pType.EndsWith(paramTypes[i], StringComparison.Ordinal))
+                if (!pType.EndsWith(expectedType, StringComparison.Ordinal))
                 {
                     match = false;
                     break;
                 }
-                if (m.Parameters[i].RefKind is RefKind.Ref or RefKind.Out
-                    && !paramTypes[i].StartsWith("ref", StringComparison.OrdinalIgnoreCase)
-                    && !paramTypes[i].StartsWith("out", StringComparison.OrdinalIgnoreCase))
+
+                // Validate ref/out match
+                var actualRefKind = m.Parameters[i].RefKind;
+                if (isRefExpected && actualRefKind != RefKind.Ref)
+                {
+                    match = false;
+                    break;
+                }
+                if (isOutExpected && actualRefKind != RefKind.Out)
+                {
+                    match = false;
+                    break;
+                }
+                if ((actualRefKind is RefKind.Ref or RefKind.Out) && !isRefExpected && !isOutExpected)
                 {
                     match = false;
                     break;

@@ -145,18 +145,23 @@ public class CallHierarchyHandler : IDisposable
     {
         Core.Models.SymbolKind.Method => 6,
         Core.Models.SymbolKind.Constructor => 9,
-        Core.Models.SymbolKind.Property => 9,
+        Core.Models.SymbolKind.Property => 7,
         Core.Models.SymbolKind.Field => 8,
-        Core.Models.SymbolKind.Event => 10,
-        Core.Models.SymbolKind.Indexer => 9,
-        Core.Models.SymbolKind.Operator => 6,
+        Core.Models.SymbolKind.Event => 24,
+        Core.Models.SymbolKind.Indexer => 7,
+        Core.Models.SymbolKind.Operator => 25,
         Core.Models.SymbolKind.Lambda => 6,
         Core.Models.SymbolKind.LocalFunction => 6,
         _ => 6,
     };
 
-    private static string UriToPath(string uri) =>
-        Uri.UnescapeDataString(uri.Replace("file:///", "").Replace('/', '\\'));
+    private static string UriToPath(string uri)
+    {
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var uriObj))
+            return uri;
+        // LocalPath handles file://, file:/// (POSIX), and file://host/path formats
+        return uriObj.LocalPath;
+    }
 
     private static string PathToUri(string path) =>
         new Uri(path).AbsoluteUri;

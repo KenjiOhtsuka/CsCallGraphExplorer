@@ -36,6 +36,7 @@ public class TreeFormatter : IOutputFormatter
             SymbolKind.Field => "F",
             SymbolKind.Indexer => "I",
             SymbolKind.Operator => "O",
+            SymbolKind.Event => "E",
             SymbolKind.Lambda => "λ",
             SymbolKind.LocalFunction => "L",
             _ => "?",
@@ -65,8 +66,11 @@ public class TreeFormatter : IOutputFormatter
         try
         {
             var cwd = Directory.GetCurrentDirectory();
-            if (fullPath.StartsWith(cwd, StringComparison.OrdinalIgnoreCase))
-                return fullPath[(cwd.Length + 1)..];
+            // Use Path.GetRelativePath to correctly handle directory boundary
+            var relative = Path.GetRelativePath(cwd, fullPath);
+            // Path.GetRelativePath returns "." when fullPath equals cwd
+            if (relative.Length < fullPath.Length)
+                return relative;
         }
         catch { }
         return fullPath;

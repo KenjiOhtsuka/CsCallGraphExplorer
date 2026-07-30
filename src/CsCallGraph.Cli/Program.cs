@@ -117,12 +117,26 @@ static async Task<int> RunAnalysisCommand(string command, string[] cmdArgs)
         return 3;
     }
 
-    var scope = scopeStr?.ToLowerInvariant() switch
+    SearchScope scope;
+    if (scopeStr == null)
     {
-        "project" => SearchScope.Project,
-        "project-with-dependencies" => SearchScope.ProjectWithDependencies,
-        _ => SearchScope.Solution,
-    };
+        scope = SearchScope.Solution;
+    }
+    else
+    {
+        scope = scopeStr.ToLowerInvariant() switch
+        {
+            "project" => SearchScope.Project,
+            "project-with-dependencies" => SearchScope.ProjectWithDependencies,
+            "solution" => SearchScope.Solution,
+            _ => (SearchScope)(-1), // invalid sentinel
+        };
+        if ((int)scope < 0)
+        {
+            Console.Error.WriteLine($"Error: unrecognized --scope value '{scopeStr}'. Valid values: solution, project, project-with-dependencies");
+            return 3;
+        }
+    }
 
     try
     {
@@ -131,11 +145,17 @@ static async Task<int> RunAnalysisCommand(string command, string[] cmdArgs)
             ? await RunAnalysisAtAsync(engine, command, solution, symbolAt, depth, scope)
             : await RunAnalysisByNameAsync(engine, command, solution, symbol!, depth, scope);
 
-        IOutputFormatter formatter = output switch
-        {
-            "json" => new JsonFormatter(),
-            _ => new TreeFormatter(),
-        };
+    IOutputFormatter formatter = output.ToLowerInvariant() switch
+    {
+        "json" => new JsonFormatter(),
+        "tree" => new TreeFormatter(),
+        _ => null!,
+    };
+    if (formatter == null)
+    {
+        Console.Error.WriteLine($"Error: unrecognized --output value '{output}'. Valid values: tree, json");
+        return 3;
+    }
 
         Console.WriteLine(formatter.Format(result));
         return 0;
