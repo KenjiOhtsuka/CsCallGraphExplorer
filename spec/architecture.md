@@ -37,14 +37,14 @@
 └─────────────────────────────────────────────────┘
 ```
 
-The CLI, LSP server, and VS Code extension are all implemented and wired.
+The CLI, LSP server, and VS Code extension are implemented and wired, though with known interoperability gaps (see [Known LSP Implementation Gaps](#known-lsp-implementation-gaps)).
 
 ## Extension Layer (TypeScript) — ✅ Done
 
 - **Activation**: `onLanguage:csharp` + `onCommand:csCallGraph.showCallers`
 - **Commands**: Registers `csCallGraph.showCallers` and `csCallGraph.showCallees`
 - **Call Hierarchy Provider**: Implements VS Code's native `CallHierarchyProvider` via LSP client
-- **LSP Client**: Connects to the standalone Roslyn language server; sends `textDocument/callHierarchy` requests
+- **LSP Client**: Connects to the standalone Roslyn language server; sends `textDocument/prepareCallHierarchy`, `callHierarchy/incomingCalls`, and `callHierarchy/outgoingCalls`
 - **Output Panel**: Fallback commands for tree view in output panel
 - **Known gaps**: `maxDepth`/`searchScope` settings declared in `package.json` but not yet wired to server; LSP frame header uses UTF-16 string length instead of UTF-8 byte count (breaks on non-ASCII)
 

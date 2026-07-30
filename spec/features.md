@@ -100,7 +100,7 @@ Items acknowledged as valid but deferred for later resolution:
 
 | # | Area | Issue | Severity | Status |
 |---|------|-------|----------|--------|
-| 1 | **LspModels.cs** | `JsonRpcId` serializes as object instead of JSON primitive; server cannot deserialize numeric `id` fields from client | Critical | Deferred |
+| 1 | **LspModels.cs** | `JsonRpcId` serializes as object instead of JSON primitive; server cannot deserialize numeric `id` fields from client | Critical | **MVP release blocker** — JSON-RPC request/response correlation broken |
 | 2 | **LSP extension.ts** | `Content-Length` computed via UTF-16 `string.length` instead of UTF-8 byte count; breaks on non-ASCII messages | Major | Deferred |
 | 3 | **CalleesQuery.cs** | Constructor initializer calls (`: this(...)`, `: base(...)`) not recorded in callee graph | Major | Deferred |
 | 4 | **VS Code settings** | `csCallGraph.maxDepth` and `csCallGraph.searchScope` declared in `package.json` but not wired to LSP server | Major | Deferred |

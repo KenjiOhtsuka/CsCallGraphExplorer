@@ -122,12 +122,15 @@ public static class SymbolResolver
             bool match = true;
             for (int i = 0; i < paramTypes.Length; i++)
             {
-                // Strip ref/out modifier from the expected parameter spec for type comparison
+                // Strip ref/out/in modifier from the expected parameter spec for type comparison
                 var expectedType = paramTypes[i];
                 var isRefExpected = expectedType.StartsWith("ref ", StringComparison.OrdinalIgnoreCase);
                 var isOutExpected = expectedType.StartsWith("out ", StringComparison.OrdinalIgnoreCase);
+                var isInExpected = expectedType.StartsWith("in ", StringComparison.OrdinalIgnoreCase);
                 if (isRefExpected || isOutExpected)
                     expectedType = expectedType[4..];
+                else if (isInExpected)
+                    expectedType = expectedType[3..];
 
                 var pType = m.Parameters[i].Type.ToDisplayString();
                 if (!pType.EndsWith(expectedType, StringComparison.Ordinal))
@@ -148,7 +151,12 @@ public static class SymbolResolver
                     match = false;
                     break;
                 }
-                if ((actualRefKind is RefKind.Ref or RefKind.Out) && !isRefExpected && !isOutExpected)
+                if (isInExpected && actualRefKind != RefKind.In)
+                {
+                    match = false;
+                    break;
+                }
+                if ((actualRefKind is RefKind.Ref or RefKind.Out or RefKind.In) && !isRefExpected && !isOutExpected && !isInExpected)
                 {
                     match = false;
                     break;

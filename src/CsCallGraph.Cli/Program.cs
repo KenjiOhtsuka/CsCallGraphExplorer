@@ -138,13 +138,6 @@ static async Task<int> RunAnalysisCommand(string command, string[] cmdArgs)
         }
     }
 
-    try
-    {
-        using var engine = new CallGraphEngine();
-        var result = symbolAt != null
-            ? await RunAnalysisAtAsync(engine, command, solution, symbolAt, depth, scope)
-            : await RunAnalysisByNameAsync(engine, command, solution, symbol!, depth, scope);
-
     IOutputFormatter formatter = output.ToLowerInvariant() switch
     {
         "json" => new JsonFormatter(),
@@ -156,6 +149,13 @@ static async Task<int> RunAnalysisCommand(string command, string[] cmdArgs)
         Console.Error.WriteLine($"Error: unrecognized --output value '{output}'. Valid values: tree, json");
         return 3;
     }
+
+    try
+    {
+        using var engine = new CallGraphEngine();
+        var result = symbolAt != null
+            ? await RunAnalysisAtAsync(engine, command, solution, symbolAt, depth, scope)
+            : await RunAnalysisByNameAsync(engine, command, solution, symbol!, depth, scope);
 
         Console.WriteLine(formatter.Format(result));
         return 0;

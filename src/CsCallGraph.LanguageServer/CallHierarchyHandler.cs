@@ -157,9 +157,8 @@ public class CallHierarchyHandler : IDisposable
 
     private static string UriToPath(string uri)
     {
-        if (!Uri.TryCreate(uri, UriKind.Absolute, out var uriObj))
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var uriObj) || !uriObj.IsFile)
             return uri;
-        // LocalPath handles file://, file:/// (POSIX), and file://host/path formats
         return uriObj.LocalPath;
     }
 

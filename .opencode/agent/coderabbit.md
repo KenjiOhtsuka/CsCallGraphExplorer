@@ -3,8 +3,8 @@ description: Processes CodeRabbit PR review comments — evaluates each, fixes i
 mode: subagent
 permission:
   read: allow
-  edit: allow
-  bash: allow
+  edit: require-approval
+  bash: require-approval
 ---
 
 You process CodeRabbit review comments on a GitHub PR for the CsCallGraphExplorer project.
@@ -25,20 +25,21 @@ For a given PR number:
    - **If reasonable**: fix the code, build (`dotnet build --nologo`), test (`dotnet test --no-build`)
    - **If not**: prepare a clear explanation (design choice, tradeoff, false positive)
 
-3. **Reply to every comment** via the GitHub API:
-   ```powershell
-   $j = @{body = "<reply-text>"; in_reply_to = <comment-id>} | ConvertTo-Json -Compress
-   $tf = [System.IO.Path]::GetTempFileName()
-   Set-Content -LiteralPath $tf -Value $j -Encoding Ascii -NoNewline
-   gh api repos/KenjiOhtsuka/CsCallGraphExplorer/pulls/<number>/comments --input $tf
-   Remove-Item $tf
-   ```
-
-4. **Commit and push** fixes:
+3. **Commit and push** fixes before replying:
    ```powershell
    git add -A
    git commit -m "fix: address CodeRabbit review comments on PR #<number>"
    git push
+   $sha = git rev-parse HEAD
+   ```
+
+4. **Reply to every comment** via the GitHub API (using the captured SHA):
+   ```powershell
+   $j = @{body = "<reply-text referencing $sha>"; in_reply_to = <comment-id>} | ConvertTo-Json -Compress
+   $tf = [System.IO.Path]::GetTempFileName()
+   Set-Content -LiteralPath $tf -Value $j -Encoding Ascii -NoNewline
+   gh api repos/KenjiOhtsuka/CsCallGraphExplorer/pulls/<number>/comments --input $tf
+   Remove-Item $tf
    ```
 
 ## Reply conventions
