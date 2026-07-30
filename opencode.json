@@ -9,12 +9,20 @@
     "tester": {
       "description": "Runs tests, diagnoses failures, and fixes test code for the CsCallGraphExplorer project.",
       "mode": "subagent"
+    },
+    "coderabbit": {
+      "description": "Processes CodeRabbit PR review comments — evaluates each, fixes if reasonable, replies to all.",
+      "mode": "subagent"
     }
   },
   "command": {
     "test": {
       "description": "Build and run tests for the CsCallGraphExplorer project.",
       "template": "Build and run tests for the CsCallGraphExplorer project:\n\n```powershell\ndotnet build CsCallGraphExplorer.sln\ndotnet test tests\\CsCallGraph.Core.Tests\\CsCallGraph.Core.Tests.csproj\n```\n\nFilter: `$ARGUMENTS`"
+    },
+    "coderabbit": {
+      "description": "Process CodeRabbit PR review comments — evaluate, fix if reasonable, reply to each.",
+      "template": "Process CodeRabbit review comments on PR `$ARGUMENTS` using the coderabbit agent."
     }
   }
 }
