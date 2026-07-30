@@ -1,0 +1,27 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.vs/
+*.DotSettings
+*.nupkg
+**/[Rr]elease/
+**/[Dd]ebug/
+
+## Node / TypeScript (VS Code extension)
+extensions/vscode/node_modules/
+extensions/vscode/out/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## IDE
+.vs/
+*.swp
+*.swo
+
+## Build artifacts
+**/packages/
+**/*.nupkg
