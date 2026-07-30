@@ -65,12 +65,15 @@ public static class CalleesQuery
             var semanticModel = await document.GetSemanticModelAsync(ct);
             if (semanticModel == null) continue;
 
-            var containingMethod = root.FindToken(loc.SourceSpan.Start).Parent?
-                .AncestorsAndSelf().OfType<BaseMethodDeclarationSyntax>().FirstOrDefault();
-            if (containingMethod == null) continue;
+            var containingMember = root.FindToken(loc.SourceSpan.Start).Parent?
+                .AncestorsAndSelf().OfType<BaseMethodDeclarationSyntax>().FirstOrDefault()
+                ?? root.FindToken(loc.SourceSpan.Start).Parent?
+                .AncestorsAndSelf().OfType<AccessorDeclarationSyntax>().FirstOrDefault()
+                as SyntaxNode;
+            if (containingMember == null) continue;
 
             // Method calls
-            foreach (var invocation in containingMethod.DescendantNodes()
+            foreach (var invocation in containingMember.DescendantNodes()
                 .OfType<InvocationExpressionSyntax>())
             {
                 var info = semanticModel.GetSymbolInfo(invocation, ct);
@@ -79,7 +82,7 @@ public static class CalleesQuery
             }
 
             // Constructor calls
-            foreach (var creation in containingMethod.DescendantNodes()
+            foreach (var creation in containingMember.DescendantNodes()
                 .OfType<ObjectCreationExpressionSyntax>())
             {
                 var info = semanticModel.GetSymbolInfo(creation, ct);
@@ -88,7 +91,7 @@ public static class CalleesQuery
             }
 
             // Property/event accesses (excluding those inside invocations/creations)
-            foreach (var memberAccess in containingMethod.DescendantNodes()
+            foreach (var memberAccess in containingMember.DescendantNodes()
                 .OfType<MemberAccessExpressionSyntax>())
             {
                 if (memberAccess.Parent is InvocationExpressionSyntax
@@ -102,10 +105,12 @@ public static class CalleesQuery
             }
 
             // Indexer accesses
-            foreach (var elementAccess in containingMethod.DescendantNodes()
+            foreach (var elementAccess in containingMember.DescendantNodes()
                 .OfType<ElementAccessExpressionSyntax>())
             {
-                if (elementAccess.Parent is AssignmentExpressionSyntax) continue;
+                if (elementAccess.Parent is AssignmentExpressionSyntax assign
+                    && assign.Left == elementAccess)
+                    continue;
 
                 var info = semanticModel.GetSymbolInfo(elementAccess, ct);
                 if (info.Symbol is IPropertySymbol { IsIndexer: true })

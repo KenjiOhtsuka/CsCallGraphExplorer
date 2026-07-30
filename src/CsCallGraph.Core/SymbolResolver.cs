@@ -15,7 +15,7 @@ public static class SymbolResolver
         Models.SymbolKind kind;
         switch (symbol)
         {
-            case IMethodSymbol m when m.MethodKind == MethodKind.Constructor:
+            case IMethodSymbol m when m.MethodKind is MethodKind.Constructor or MethodKind.StaticConstructor:
                 kind = Models.SymbolKind.Constructor; break;
             case IMethodSymbol m when m.MethodKind == MethodKind.Ordinary:
                 kind = Models.SymbolKind.Method; break;
@@ -25,6 +25,8 @@ public static class SymbolResolver
                 kind = Models.SymbolKind.LocalFunction; break;
             case IMethodSymbol m when m.MethodKind == MethodKind.UserDefinedOperator:
                 kind = Models.SymbolKind.Operator; break;
+            case IPropertySymbol { IsIndexer: true }:
+                kind = Models.SymbolKind.Indexer; break;
             case IPropertySymbol:
                 kind = Models.SymbolKind.Property; break;
             case IFieldSymbol:
@@ -104,30 +106,71 @@ public static class SymbolResolver
         var methods = members.OfType<IMethodSymbol>().ToList();
         if (methods.Count == 0) return null;
 
-        // No param spec — return null to signal ambiguity
         if (paramSpec == null) return null;
 
-        // Empty string from "Method()" — match parameterless
         if (paramSpec.Length == 0)
             return methods.FirstOrDefault(m => m.Parameters.Length == 0);
 
-        var paramTypes = paramSpec.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var paramTypes = SplitParamTypes(paramSpec);
+        var matched = new List<IMethodSymbol>();
 
-        return methods.FirstOrDefault(m =>
+        foreach (var m in methods)
         {
-            if (paramTypes.Length == 0)
-                return m.Parameters.Length == 0;
-            if (paramTypes.Length != m.Parameters.Length)
-                return false;
+            if (m.Parameters.Length != paramTypes.Length)
+                continue;
 
+            bool match = true;
             for (int i = 0; i < paramTypes.Length; i++)
             {
                 var pType = m.Parameters[i].Type.ToDisplayString();
                 if (!pType.EndsWith(paramTypes[i], StringComparison.Ordinal))
-                    return false;
+                {
+                    match = false;
+                    break;
+                }
+                if (m.Parameters[i].RefKind is RefKind.Ref or RefKind.Out
+                    && !paramTypes[i].StartsWith("ref", StringComparison.OrdinalIgnoreCase)
+                    && !paramTypes[i].StartsWith("out", StringComparison.OrdinalIgnoreCase))
+                {
+                    match = false;
+                    break;
+                }
             }
-            return true;
-        });
+            if (match)
+                matched.Add(m);
+        }
+
+        if (matched.Count == 1)
+            return matched[0];
+
+        return null;
+    }
+
+    private static string[] SplitParamTypes(string paramSpec)
+    {
+        var result = new List<string>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < paramSpec.Length; i++)
+        {
+            switch (paramSpec[i])
+            {
+                case '<':
+                case '[':
+                    depth++;
+                    break;
+                case '>':
+                case ']':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    result.Add(paramSpec[start..i].Trim());
+                    start = i + 1;
+                    break;
+            }
+        }
+        result.Add(paramSpec[start..].Trim());
+        return [.. result];
     }
 
     private static IEnumerable<INamespaceSymbol> GetNamespaces(INamespaceSymbol root)

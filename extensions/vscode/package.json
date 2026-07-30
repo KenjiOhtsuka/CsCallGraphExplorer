@@ -1,0 +1,91 @@
+{
+  "name": "cs-call-graph",
+  "displayName": "CsCallGraph",
+  "description": "Call-hierarchy exploration for C# using Roslyn",
+  "version": "0.1.0",
+  "publisher": "cs-call-graph",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onLanguage:csharp",
+    "onCommand:csCallGraph.showCallers",
+    "onCommand:csCallGraph.showCallees",
+    "onCommand:csCallGraph.listSymbols"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "csCallGraph.showCallers",
+        "title": "CsCallGraph: Show Callers"
+      },
+      {
+        "command": "csCallGraph.showCallees",
+        "title": "CsCallGraph: Show Callees"
+      },
+      {
+        "command": "csCallGraph.listSymbols",
+        "title": "CsCallGraph: List Symbols"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorLangId == csharp",
+          "submenu": "csCallGraphContext"
+        }
+      ],
+      "csCallGraphContext": [
+        {
+          "command": "csCallGraph.showCallers",
+          "group": "csCallGraph@1"
+        },
+        {
+          "command": "csCallGraph.showCallees",
+          "group": "csCallGraph@2"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "csCallGraphContext",
+        "label": "CsCallGraph"
+      }
+    ],
+    "configuration": {
+      "title": "CsCallGraph",
+      "properties": {
+        "csCallGraph.solutionPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the .sln file (relative to workspace root)"
+        },
+        "csCallGraph.maxDepth": {
+          "type": "number",
+          "default": 10,
+          "description": "Maximum depth (0 = unlimited)"
+        },
+        "csCallGraph.searchScope": {
+          "type": "string",
+          "enum": ["solution", "project", "project-with-dependencies"],
+          "default": "solution",
+          "description": "Search scope"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "tsc -p ./",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

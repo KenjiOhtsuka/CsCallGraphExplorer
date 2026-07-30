@@ -10,8 +10,8 @@ public class CallGraphEngine : IDisposable
     private const int DefaultMaxDepth = 10;
     private const SearchScope DefaultScope = SearchScope.Solution;
 
-    private readonly ConcurrentDictionary<string, Solution> _solutionCache = new();
-    private readonly ConcurrentDictionary<string, Compilation> _compilationCache = new();
+    private readonly ConcurrentDictionary<string, Lazy<Task<Solution>>> _solutionCache = new();
+    private readonly ConcurrentDictionary<string, Lazy<Task<Compilation?>>> _compilationCache = new();
     private readonly ConcurrentDictionary<string, MSBuildWorkspace> _workspaceCache = new();
 
     public async Task<CallGraphResult> GetCallersAsync(
@@ -102,17 +102,7 @@ public class CallGraphEngine : IDisposable
         if (target == null)
             throw new SymbolNotFoundException(symbolName);
 
-        var scoped = ScopeSolution(solution, target, scope);
-        var roots = direction == CallDirection.Callers
-            ? await CallersQuery.BuildCallersTreeAsync(scoped, target, maxDepth, ct)
-            : await CalleesQuery.BuildCalleesTreeAsync(scoped, target, maxDepth, ct);
-
-        return new CallGraphResult
-        {
-            Target = SymbolResolver.CreateDescriptor(target),
-            Direction = direction,
-            Roots = roots,
-        };
+        return await BuildResultAsync(solution, target, direction, maxDepth, scope, ct);
     }
 
     private async Task<CallGraphResult> AnalyzeAtAsync(
@@ -131,6 +121,13 @@ public class CallGraphEngine : IDisposable
         if (target == null)
             throw new SymbolNotFoundException($"{filePath}:{line + 1},{column + 1}");
 
+        return await BuildResultAsync(solution, target, direction, maxDepth, scope, ct);
+    }
+
+    private static async Task<CallGraphResult> BuildResultAsync(
+        Solution solution, ISymbol target, CallDirection direction,
+        int maxDepth, SearchScope scope, CancellationToken ct)
+    {
         var scoped = ScopeSolution(solution, target, scope);
         var roots = direction == CallDirection.Callers
             ? await CallersQuery.BuildCallersTreeAsync(scoped, target, maxDepth, ct)
@@ -157,8 +154,21 @@ public class CallGraphEngine : IDisposable
         var keepIds = new HashSet<ProjectId> { containingProject.Id };
         if (scope == SearchScope.ProjectWithDependencies)
         {
-            foreach (var refProj in containingProject.ProjectReferences)
-                keepIds.Add(refProj.ProjectId);
+            var queue = new Queue<Project>();
+            queue.Enqueue(containingProject);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                foreach (var refProj in current.ProjectReferences)
+                {
+                    if (keepIds.Add(refProj.ProjectId))
+                    {
+                        var referenced = solution.GetProject(refProj.ProjectId);
+                        if (referenced != null)
+                            queue.Enqueue(referenced);
+                    }
+                }
+            }
         }
 
         var toRemove = solution.Projects
@@ -190,13 +200,15 @@ public class CallGraphEngine : IDisposable
         var parent = token.Parent;
         if (parent == null) return null;
 
-        var symbol = semanticModel.GetDeclaredSymbol(parent, ct)
-                  ?? semanticModel.GetSymbolInfo(parent, ct).Symbol;
-        if (symbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction })
-            return symbol;
+        var declared = semanticModel.GetDeclaredSymbol(parent, ct);
+        if (declared != null)
+            return declared;
 
-        var binding = semanticModel.GetSymbolInfo(parent, ct);
-        return binding.Symbol ?? binding.CandidateSymbols.FirstOrDefault();
+        var info = semanticModel.GetSymbolInfo(parent, ct);
+        if (info.Symbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction })
+            return info.Symbol;
+
+        return info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
     }
 
     private static Document? FindDocumentByPath(Solution solution, string filePath)
@@ -213,25 +225,22 @@ public class CallGraphEngine : IDisposable
 
     private async Task<Solution> GetSolutionAsync(string solutionPath, CancellationToken ct)
     {
-        if (_solutionCache.TryGetValue(solutionPath, out var solution))
-            return solution;
-
-        var workspace = await OpenSolutionAsync(solutionPath, ct);
-        solution = workspace.CurrentSolution;
-        _solutionCache.TryAdd(solutionPath, solution);
-        return solution;
+        var lazy = _solutionCache.GetOrAdd(solutionPath, new Lazy<Task<Solution>>(async () =>
+        {
+            var workspace = await OpenSolutionAsync(solutionPath, ct);
+            return workspace.CurrentSolution;
+        }));
+        return await lazy.Value;
     }
 
     private async Task<Compilation?> GetCompilationAsync(Project project, CancellationToken ct)
     {
         var key = project.FilePath ?? project.Name;
-        if (_compilationCache.TryGetValue(key, out var compilation))
-            return compilation;
-
-        compilation = await project.GetCompilationAsync(ct);
-        if (compilation != null)
-            _compilationCache.TryAdd(key, compilation);
-        return compilation;
+        var lazy = _compilationCache.GetOrAdd(key, new Lazy<Task<Compilation?>>(async () =>
+        {
+            return await project.GetCompilationAsync(ct);
+        }));
+        return await lazy.Value;
     }
 
     private async Task<ISymbol?> ResolveTargetSymbolAsync(
@@ -270,14 +279,12 @@ public class CallGraphEngine : IDisposable
             memberLookupName = memberName[..genericArgStart];
 
         var projects = solution.Projects.ToList();
-        var earlyExitCts = new CancellationTokenSource();
-        var found = (symbol: (ISymbol?)null, isAmbiguous: false);
+        var foundSymbols = new List<ISymbol>();
+        var isAmbiguous = false;
         var lockObj = new object();
 
         await Parallel.ForEachAsync(projects, ct, async (project, token) =>
         {
-            if (earlyExitCts.Token.IsCancellationRequested) return;
-
             var compilation = await GetCompilationAsync(project, token);
             if (compilation == null) return;
 
@@ -289,22 +296,25 @@ public class CallGraphEngine : IDisposable
             lock (lockObj)
             {
                 if (ambig)
+                    isAmbiguous = true;
+                else if (sym != null)
                 {
-                    found = (null, true);
-                    earlyExitCts.Cancel();
-                }
-                else if (found.symbol == null)
-                {
-                    found = (sym, false);
-                    earlyExitCts.Cancel();
+                    if (!foundSymbols.Any(s => SymbolEqualityComparer.Default.Equals(s, sym)))
+                        foundSymbols.Add(sym);
                 }
             }
         });
 
-        if (found.isAmbiguous)
+        if (isAmbiguous)
             throw new AmbiguousSymbolException(symbolName);
 
-        return found.symbol;
+        if (foundSymbols.Count == 1)
+            return foundSymbols[0];
+
+        if (foundSymbols.Count > 1)
+            throw new AmbiguousSymbolException(symbolName);
+
+        return null;
     }
 
     private static (ISymbol? Symbol, bool IsAmbiguous)? ResolveSymbolInCompilation(
@@ -406,27 +416,39 @@ public class CallGraphEngine : IDisposable
         {
             if (member is INamedTypeSymbol type)
             {
-                foreach (var sub in type.GetMembers())
-                {
-                    if (sub.IsImplicitlyDeclared || !sub.Locations.Any(l => l.IsInSource))
-                        continue;
-
-                    switch (sub)
-                    {
-                        case IMethodSymbol m when m.MethodKind is MethodKind.Ordinary or MethodKind.Constructor:
-                            results.Add($"{type.ToDisplayString()}.{sub.Name}");
-                            break;
-                        case IPropertySymbol:
-                        case IFieldSymbol:
-                        case IEventSymbol:
-                            results.Add($"{type.ToDisplayString()}.{sub.Name}");
-                            break;
-                    }
-                }
+                CollectTypeMembers(type, results);
             }
             else if (member is INamespaceSymbol ns)
             {
                 CollectCallableSymbols(ns, results);
+            }
+        }
+    }
+
+    private static void CollectTypeMembers(INamedTypeSymbol type, List<string> results)
+    {
+        foreach (var sub in type.GetMembers())
+        {
+            if (sub.IsImplicitlyDeclared || !sub.Locations.Any(l => l.IsInSource))
+                continue;
+
+            if (sub is INamedTypeSymbol nested)
+            {
+                CollectTypeMembers(nested, results);
+            }
+            else
+            {
+                switch (sub)
+                {
+                    case IMethodSymbol m when m.MethodKind is MethodKind.Ordinary or MethodKind.Constructor:
+                        results.Add($"{type.ToDisplayString()}.{sub.Name}");
+                        break;
+                    case IPropertySymbol:
+                    case IFieldSymbol:
+                    case IEventSymbol:
+                        results.Add($"{type.ToDisplayString()}.{sub.Name}");
+                        break;
+                }
             }
         }
     }
