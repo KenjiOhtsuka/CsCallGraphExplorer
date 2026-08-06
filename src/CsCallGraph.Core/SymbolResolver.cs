@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using CsCallGraph.Core.Models;
 
 namespace CsCallGraph.Core;
@@ -45,15 +46,9 @@ public static class SymbolResolver
             IsOut = p.RefKind == RefKind.Out,
         }).ToList() ?? [];
 
-        var declLocs = symbol.Locations
-            .Where(l => l.IsInSource)
-            .Select(l => new CallSite
-            {
-                FilePath = l.SourceTree?.FilePath ?? "",
-                LineNumber = l.GetLineSpan().StartLinePosition.Line,
-                Column = l.GetLineSpan().StartLinePosition.Character,
-            })
-            .ToList();
+        var declLocs = GetDeclarationLocations(symbol);
+
+        var identLocs = GetIdentifierLocations(symbol);
 
         return new SymbolDescriptor
         {
@@ -66,8 +61,82 @@ public static class SymbolResolver
             Arity = namedType?.Arity ?? method?.Arity ?? 0,
             Parameters = parameters,
             DeclarationLocations = declLocs,
+            IdentifierLocations = identLocs,
             DisplayString = symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
         };
+    }
+
+    private static List<CallSite> GetDeclarationLocations(ISymbol symbol)
+    {
+        var syntaxLocs = symbol.DeclaringSyntaxReferences
+            .Select(r => r.GetSyntax().GetLocation())
+            .Where(l => l.IsInSource)
+            .Select(ToCallSite)
+            .ToList();
+        if (syntaxLocs.Count > 0) return syntaxLocs;
+
+        return symbol.Locations
+            .Where(l => l.IsInSource)
+            .Select(ToCallSite)
+            .ToList();
+    }
+
+    public static CallSite ToCallSite(Location location)
+    {
+        var span = location.GetLineSpan();
+        return new CallSite
+        {
+            FilePath = location.SourceTree?.FilePath ?? "",
+            LineNumber = span.StartLinePosition.Line,
+            Column = span.StartLinePosition.Character,
+            EndLineNumber = span.EndLinePosition.Line,
+            EndColumn = span.EndLinePosition.Character,
+        };
+    }
+
+    private static List<CallSite> GetIdentifierLocations(ISymbol symbol)
+    {
+        var token = GetIdentifierToken(symbol);
+        if (token is not { } id || id.Span.IsEmpty)
+            return [];
+
+        var lineSpan = id.SyntaxTree.GetLineSpan(id.Span);
+        return
+        [
+            new CallSite
+            {
+                FilePath = id.SyntaxTree.FilePath,
+                LineNumber = lineSpan.StartLinePosition.Line,
+                Column = lineSpan.StartLinePosition.Character,
+                EndLineNumber = lineSpan.EndLinePosition.Line,
+                EndColumn = lineSpan.EndLinePosition.Character,
+            },
+        ];
+    }
+
+    private static SyntaxToken? GetIdentifierToken(ISymbol symbol)
+    {
+        foreach (var reference in symbol.DeclaringSyntaxReferences)
+        {
+            switch (reference.GetSyntax())
+            {
+                case MethodDeclarationSyntax m: return m.Identifier;
+                case LocalFunctionStatementSyntax l: return l.Identifier;
+                case ConstructorDeclarationSyntax c: return c.Identifier;
+                case DestructorDeclarationSyntax d: return d.Identifier;
+                case PropertyDeclarationSyntax p: return p.Identifier;
+                case EventDeclarationSyntax e: return e.Identifier;
+                case VariableDeclaratorSyntax v: return v.Identifier;
+                case OperatorDeclarationSyntax o: return o.OperatorToken;
+                case IndexerDeclarationSyntax i: return i.ThisKeyword;
+                case RecordDeclarationSyntax r: return r.Identifier;
+                case TypeDeclarationSyntax t: return t.Identifier;
+                case EnumDeclarationSyntax e: return e.Identifier;
+                case DelegateDeclarationSyntax d: return d.Identifier;
+                default: continue;
+            }
+        }
+        return null;
     }
 
     public static INamedTypeSymbol? FindType(Compilation compilation, string qualifiedTypeName)

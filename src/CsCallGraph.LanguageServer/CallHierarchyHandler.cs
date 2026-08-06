@@ -33,7 +33,7 @@ public class CallHierarchyHandler : IDisposable
         var filePath = UriToPath(uri);
         var desc = _engine.ResolveSymbolAtAsync(_solutionPath, filePath, line, character).GetAwaiter().GetResult();
 
-        var item = ToLspItem(desc, uri);
+        var item = ToLspItem(desc);
         var items = item != null ? new[] { item } : [];
         return new JsonRpcMessage
         {
@@ -50,7 +50,7 @@ public class CallHierarchyHandler : IDisposable
         if (symbol == null) return Result(msg.Id, Array.Empty<CallHierarchyIncomingCall>());
 
         var result = _engine.GetCallersAsync(_solutionPath, symbol).GetAwaiter().GetResult();
-        var calls = result.Roots.Select(n => ToIncomingCall(n, item)).ToArray();
+        var calls = result.Roots.Select(ToIncomingCall).ToArray();
         return new JsonRpcMessage
         {
             Id = msg.Id,
@@ -66,7 +66,7 @@ public class CallHierarchyHandler : IDisposable
         if (symbol == null) return Result(msg.Id, Array.Empty<CallHierarchyOutgoingCall>());
 
         var result = _engine.GetCalleesAsync(_solutionPath, symbol).GetAwaiter().GetResult();
-        var calls = result.Roots.Select(n => ToOutgoingCall(n, item)).ToArray();
+        var calls = result.Roots.Select(ToOutgoingCall).ToArray();
         return new JsonRpcMessage
         {
             Id = msg.Id,
@@ -74,72 +74,62 @@ public class CallHierarchyHandler : IDisposable
         };
     }
 
-    private static CallHierarchyItem? ToLspItem(SymbolDescriptor? desc, string uri)
+    private static CallHierarchyItem? ToLspItem(SymbolDescriptor? desc)
     {
         if (desc == null) return null;
+
+        var declaration = desc.DeclarationLocations.FirstOrDefault();
+        if (declaration == null) return null;
+
+        var selection = desc.IdentifierLocations.Count > 0
+            ? desc.IdentifierLocations[0]
+            : declaration;
+
         return new CallHierarchyItem
         {
             Name = desc.DisplayString,
             Kind = ToLspSymbolKind(desc.Kind),
             Detail = desc.FullyQualifiedName,
-            Uri = uri,
-            Range = new Range
-            {
-                Start = new Position(),
-                End = new Position(),
-            },
-            SelectionRange = new Range
-            {
-                Start = new Position(),
-                End = new Position(),
-            },
+            Uri = PathToUri(declaration.FilePath),
+            Range = ToRange(declaration),
+            SelectionRange = ToRange(selection),
             Data = desc.FullyQualifiedName,
         };
     }
 
-    private static CallHierarchyIncomingCall ToIncomingCall(CallGraphNode node, System.Text.Json.JsonElement parentItem)
+    private static CallHierarchyIncomingCall ToIncomingCall(CallGraphNode node)
     {
-        var file = node.CallSites.FirstOrDefault()?.FilePath ?? "";
-        var line = node.CallSites.FirstOrDefault()?.LineNumber ?? 0;
-        var col = node.CallSites.FirstOrDefault()?.Column ?? 0;
-
         return new CallHierarchyIncomingCall
         {
-            From = new CallHierarchyItem
+            From = ToLspItem(node.Symbol) ?? new CallHierarchyItem
             {
                 Name = node.Symbol.DisplayString,
                 Kind = ToLspSymbolKind(node.Symbol.Kind),
-                Detail = node.Symbol.FullyQualifiedName,
-                Uri = PathToUri(file),
-                Range = new Range { Start = new Position(), End = new Position() },
-                SelectionRange = new Range { Start = new Position { Line = line, Character = col }, End = new Position { Line = line, Character = col } },
                 Data = node.Symbol.FullyQualifiedName,
             },
-            FromRanges = [new Range { Start = new Position { Line = line, Character = col }, End = new Position { Line = line, Character = col } }],
+            FromRanges = node.CallSites.Select(ToRange).ToArray(),
         };
     }
 
-    private static CallHierarchyOutgoingCall ToOutgoingCall(CallGraphNode node, System.Text.Json.JsonElement parentItem)
+    private static CallHierarchyOutgoingCall ToOutgoingCall(CallGraphNode node)
     {
-        var file = node.CallSites.FirstOrDefault()?.FilePath ?? "";
-        var line = node.CallSites.FirstOrDefault()?.LineNumber ?? 0;
-        var col = node.CallSites.FirstOrDefault()?.Column ?? 0;
-
         return new CallHierarchyOutgoingCall
         {
-            To = new CallHierarchyItem
+            To = ToLspItem(node.Symbol) ?? new CallHierarchyItem
             {
                 Name = node.Symbol.DisplayString,
                 Kind = ToLspSymbolKind(node.Symbol.Kind),
-                Detail = node.Symbol.FullyQualifiedName,
-                Uri = PathToUri(file),
-                Range = new Range { Start = new Position(), End = new Position() },
-                SelectionRange = new Range { Start = new Position { Line = line, Character = col }, End = new Position { Line = line, Character = col } },
                 Data = node.Symbol.FullyQualifiedName,
             },
-            FromRanges = [new Range { Start = new Position { Line = line, Character = col }, End = new Position { Line = line, Character = col } }],
+            FromRanges = node.CallSites.Select(ToRange).ToArray(),
         };
     }
+
+    private static Range ToRange(CallSite site) => new()
+    {
+        Start = new Position { Line = site.LineNumber, Character = site.Column },
+        End = new Position { Line = site.EndLineNumber, Character = site.EndColumn },
+    };
 
     private static int ToLspSymbolKind(SymbolKind kind) => kind switch
     {
