@@ -15,6 +15,11 @@ public partial class LspServer : IDisposable
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
+    static LspServer()
+    {
+        JsonOpts.Converters.Add(new JsonRpcIdConverter());
+    }
+
     public LspServer(string solutionPath)
     {
         var engine = new CallGraphEngine();
