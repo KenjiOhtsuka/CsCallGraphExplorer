@@ -149,7 +149,7 @@ public class CallHierarchyHandler : IDisposable
     }
 
     private static string PathToUri(string path) =>
-        new Uri(path).AbsoluteUri;
+        string.IsNullOrEmpty(path) ? "" : new Uri(path).AbsoluteUri;
 
     private static JsonRpcMessage Result(JsonRpcId? id, object value) =>
         new() { Id = id, Result = JsonSerializer.SerializeToElement(value, JsonOpts) };

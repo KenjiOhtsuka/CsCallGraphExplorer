@@ -6,20 +6,22 @@ namespace CsCallGraph.LanguageServer.Tests;
 [Collection("Handler")]
 public class CallHierarchyHandlerTests
 {
-    private const string CallersFile = "file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs";
-
     private readonly HandlerFixture _fixture;
+    private readonly string _callersFile;
 
     public CallHierarchyHandlerTests(HandlerFixture fixture)
     {
         _fixture = fixture;
+        _callersFile = new Uri(Path.Combine(
+            Path.GetDirectoryName(fixture.SolutionPath)!,
+            "SampleConsoleApp", "Callers.cs")).AbsoluteUri;
     }
 
     [Fact]
     public void PrepareCallHierarchy_UsesDeclarationFileAndPreciseRanges()
     {
         var response = _fixture.Handler.PrepareCallHierarchy(
-            PrepareRequest(CallersFile, line: 37, character: 22));
+            PrepareRequest(_callersFile, line: 37, character: 22));
 
         var items = Deserialize<CallHierarchyItem[]>(response);
         var item = Assert.Single(items);
@@ -36,7 +38,7 @@ public class CallHierarchyHandlerTests
     public void PrepareCallHierarchy_DeclarationSpanCoversSelectionSpan()
     {
         var response = _fixture.Handler.PrepareCallHierarchy(
-            PrepareRequest(CallersFile, line: 11, character: 18));
+            PrepareRequest(_callersFile, line: 11, character: 18));
 
         var items = Deserialize<CallHierarchyItem[]>(response);
         var item = Assert.Single(items);

@@ -77,7 +77,7 @@ Replace the file path with your actual absolute path. `line` and `character` are
 ### Send incomingCalls (callers)
 
 ```powershell
-Send-Lsp '{"jsonrpc":"2.0","id":3,"method":"callHierarchy/incomingCalls","params":{"item":{"name":"StaticMethod","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleLibrary/PublicMethods.cs","range":{"start":{"line":10,"character":4},"end":{"line":14,"character":0}},"selectionRange":{"start":{"line":10,"character":23},"end":{"line":10,"character":35}},"data":"SampleLibrary.PublicMethods.StaticMethod(string)"}}}'
+Send-Lsp '{"jsonrpc":"2.0","id":3,"method":"callHierarchy/incomingCalls","params":{"item":{"name":"StaticMethod","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleLibrary/PublicMethods.cs","range":{"start":{"line":10,"character":4},"end":{"line":13,"character":5}},"selectionRange":{"start":{"line":10,"character":23},"end":{"line":10,"character":35}},"data":"SampleLibrary.PublicMethods.StaticMethod(string)"}}}'
 ```
 
 `data` is copied verbatim from the item returned by prepareCallHierarchy.
@@ -86,7 +86,7 @@ Send-Lsp '{"jsonrpc":"2.0","id":3,"method":"callHierarchy/incomingCalls","params
 ### Send outgoingCalls (callees)
 
 ```powershell
-Send-Lsp '{"jsonrpc":"2.0","id":4,"method":"callHierarchy/outgoingCalls","params":{"item":{"name":"RunAll","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs","range":{"start":{"line":11,"character":4},"end":{"line":29,"character":0}},"selectionRange":{"start":{"line":11,"character":16},"end":{"line":11,"character":22}},"data":"SampleConsoleApp.Callers.RunAll"}}}'
+Send-Lsp '{"jsonrpc":"2.0","id":4,"method":"callHierarchy/outgoingCalls","params":{"item":{"name":"RunAll","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs","range":{"start":{"line":11,"character":4},"end":{"line":28,"character":5}},"selectionRange":{"start":{"line":11,"character":16},"end":{"line":11,"character":22}},"data":"SampleConsoleApp.Callers.RunAll()"}}}'
 ```
 
 ### Shutdown

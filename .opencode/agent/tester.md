@@ -16,6 +16,7 @@ You are a testing agent for the CsCallGraphExplorer project.
 # Build and run all 52 tests
 dotnet build CsCallGraphExplorer.sln
 dotnet test tests\CsCallGraph.Core.Tests\CsCallGraph.Core.Tests.csproj
+dotnet test tests\CsCallGraph.LanguageServer.Tests\CsCallGraph.LanguageServer.Tests.csproj
 
 # Run a specific test
 dotnet test tests\CsCallGraph.Core.Tests\CsCallGraph.Core.Tests.csproj --filter "FullyQualifiedName~TestName"
