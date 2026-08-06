@@ -37,6 +37,10 @@ The `Send-Lsp` helper below computes it automatically, so the frames are always 
 ```powershell
 function Send-Lsp {
   param([string]$Body)
+  # Pipe the frame as UTF-8 no-BOM; otherwise PowerShell re-encodes piped
+  # strings with $OutputEncoding (ASCII by default in Windows PowerShell 5.1),
+  # which corrupts non-ASCII bodies and breaks the declared Content-Length.
+  $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($Body)
   $frame = "Content-Length: $($bytes.Length)`r`n`r`n$Body"
   $frame
@@ -73,15 +77,16 @@ Replace the file path with your actual absolute path. `line` and `character` are
 ### Send incomingCalls (callers)
 
 ```powershell
-Send-Lsp '{"jsonrpc":"2.0","id":3,"method":"callHierarchy/incomingCalls","params":{"item":{"name":"StaticMethod","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs","range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"selectionRange":{"start":{"line":36,"character":0},"end":{"line":36,"character":0}},"data":"SampleLibrary.PublicMethods.StaticMethod(string)"}}}'
+Send-Lsp '{"jsonrpc":"2.0","id":3,"method":"callHierarchy/incomingCalls","params":{"item":{"name":"StaticMethod","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleLibrary/PublicMethods.cs","range":{"start":{"line":10,"character":4},"end":{"line":14,"character":0}},"selectionRange":{"start":{"line":10,"character":23},"end":{"line":10,"character":35}},"data":"SampleLibrary.PublicMethods.StaticMethod(string)"}}}'
 ```
 
 `data` is copied verbatim from the item returned by prepareCallHierarchy.
+`selectionRange` must be contained by `range`; here it highlights the `StaticMethod` identifier on its declaration line 10 (0-based).
 
 ### Send outgoingCalls (callees)
 
 ```powershell
-Send-Lsp '{"jsonrpc":"2.0","id":4,"method":"callHierarchy/outgoingCalls","params":{"item":{"name":"RunAll","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs","range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"selectionRange":{"start":{"line":12,"character":0},"end":{"line":12,"character":0}},"data":"SampleConsoleApp.Callers.RunAll"}}}'
+Send-Lsp '{"jsonrpc":"2.0","id":4,"method":"callHierarchy/outgoingCalls","params":{"item":{"name":"RunAll","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs","range":{"start":{"line":11,"character":4},"end":{"line":29,"character":0}},"selectionRange":{"start":{"line":11,"character":16},"end":{"line":11,"character":22}},"data":"SampleConsoleApp.Callers.RunAll"}}}'
 ```
 
 ### Shutdown
