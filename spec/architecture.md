@@ -92,7 +92,7 @@ We follow the [LSP 3.16 Call Hierarchy](https://microsoft.github.io/language-ser
 | # | File | Issue | Impact |
 |---|------|-------|--------|
 | 1 | `LspModels.cs` | `JsonRpcId` lacks `JsonConverter`; numeric IDs serialize as objects `{"id":{}}` instead of `{"id":1}` | **Fixed** in PR #14 — `JsonRpcIdConverter` reads/writes scalar string or integer ids |
-| 2 | `LspModels.cs` | `TextDocumentSync` advertises `Full` (1) but server ignores `didOpen`/`didChange` | Client may send unnecessary document sync traffic |
+| 2 | `LspModels.cs` | `TextDocumentSync` advertises `Full` (1) but server ignores `didOpen`/`didChange` | **Fixed** in PR #22 — server advertises `TextDocumentSync.None` (0); it resolves call hierarchy data from disk |
 | 3 | `extension.ts` | `Content-Length` uses UTF-16 `string.length` instead of UTF-8 byte count | Breaks on non-ASCII characters split across TCP chunks |
 | 4 | `extension.ts` | `csCallGraph.maxDepth` and `csCallGraph.searchScope` settings declared but never sent to server | Settings have no effect |
 | 5 | `CallHierarchyHandler.cs` | `ToLspItem`/`ToIncomingCall`/`ToOutgoingCall` range fields may mix declaration and call-site positions | **Fixed** in PR #21 — every item uses its symbol's declaration file, full-span `range`, and identifier-only `selectionRange`; call-site positions live only in `FromRanges` |

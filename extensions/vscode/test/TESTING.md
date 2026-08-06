@@ -59,7 +59,7 @@ Send-Lsp '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":nu
 
 Expected response:
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"callHierarchyProvider":true}}}
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":0,"callHierarchyProvider":true}}}
 ```
 
 ### Send prepareCallHierarchy

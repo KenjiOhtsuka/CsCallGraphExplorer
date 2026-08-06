@@ -76,7 +76,7 @@ public class InitializeResult
 public class ServerCapabilities
 {
     [JsonPropertyName("textDocumentSync")]
-    public int TextDocumentSync { get; set; } = 1; // Full
+    public int TextDocumentSync { get; set; } // 0 = None (server resolves from disk; no didOpen/didChange)
 
     [JsonPropertyName("callHierarchyProvider")]
     public bool CallHierarchyProvider { get; set; } = true;
