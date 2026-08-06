@@ -3,8 +3,8 @@ description: Processes CodeRabbit PR review comments — evaluates each, fixes i
 mode: subagent
 permission:
   read: allow
-  edit: require-approval
-  bash: require-approval
+  edit: ask
+  bash: ask
 ---
 
 You process CodeRabbit review comments on a GitHub PR for the CsCallGraphExplorer project.
