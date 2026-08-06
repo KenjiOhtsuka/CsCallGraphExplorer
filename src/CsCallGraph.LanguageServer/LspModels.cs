@@ -82,17 +82,6 @@ public class ServerCapabilities
     public bool CallHierarchyProvider { get; set; } = true;
 }
 
-public class TextDocumentItem
-{
-    [JsonPropertyName("uri")] public string Uri { get; set; } = "";
-
-    [JsonPropertyName("languageId")] public string LanguageId { get; set; } = "";
-
-    [JsonPropertyName("version")] public int Version { get; set; }
-
-    [JsonPropertyName("text")] public string Text { get; set; } = "";
-}
-
 public class Position
 {
     [JsonPropertyName("line")] public int Line { get; set; }

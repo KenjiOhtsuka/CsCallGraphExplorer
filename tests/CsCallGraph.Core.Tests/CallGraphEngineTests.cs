@@ -304,6 +304,19 @@ public class CallGraphEngineTests
         Assert.Equal("SampleLibrary.NonexistentClass.NonexistentMethod", ex.SymbolName);
     }
 
+    [Fact]
+    public async Task Engine_CancelledFirstCall_DoesNotPoisonSolutionCache()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _engine.ListSymbolsAsync(_fixture.SolutionPath, cts.Token));
+
+        var symbols = await _engine.ListSymbolsAsync(_fixture.SolutionPath);
+        Assert.NotEmpty(symbols);
+    }
+
     #endregion
 
     private static List<string> FlattenNames(List<CallGraphNode> nodes)

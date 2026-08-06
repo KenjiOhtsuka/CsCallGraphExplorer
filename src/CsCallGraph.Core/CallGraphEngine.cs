@@ -235,6 +235,10 @@ public class CallGraphEngine : IDisposable
         {
             return await lazy.Value.WaitAsync(ct);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             _solutionCache.TryRemove(new KeyValuePair<string, Lazy<Task<Solution>>>(solutionPath, lazy));
@@ -253,6 +257,10 @@ public class CallGraphEngine : IDisposable
         try
         {
             return await lazy.Value.WaitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
