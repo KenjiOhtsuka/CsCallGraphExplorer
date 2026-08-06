@@ -227,10 +227,19 @@ public class CallGraphEngine : IDisposable
     {
         var lazy = _solutionCache.GetOrAdd(solutionPath, new Lazy<Task<Solution>>(async () =>
         {
-            var workspace = await OpenSolutionAsync(solutionPath, ct);
+            var workspace = await OpenSolutionAsync(solutionPath, CancellationToken.None);
             return workspace.CurrentSolution;
         }));
-        return await lazy.Value;
+
+        try
+        {
+            return await lazy.Value.WaitAsync(ct);
+        }
+        catch
+        {
+            _solutionCache.TryRemove(new KeyValuePair<string, Lazy<Task<Solution>>>(solutionPath, lazy));
+            throw;
+        }
     }
 
     private async Task<Compilation?> GetCompilationAsync(Project project, CancellationToken ct)
@@ -238,9 +247,18 @@ public class CallGraphEngine : IDisposable
         var key = project.FilePath ?? project.Name;
         var lazy = _compilationCache.GetOrAdd(key, new Lazy<Task<Compilation?>>(async () =>
         {
-            return await project.GetCompilationAsync(ct);
+            return await project.GetCompilationAsync(CancellationToken.None);
         }));
-        return await lazy.Value;
+
+        try
+        {
+            return await lazy.Value.WaitAsync(ct);
+        }
+        catch
+        {
+            _compilationCache.TryRemove(new KeyValuePair<string, Lazy<Task<Compilation?>>>(key, lazy));
+            throw;
+        }
     }
 
     private async Task<ISymbol?> ResolveTargetSymbolAsync(
