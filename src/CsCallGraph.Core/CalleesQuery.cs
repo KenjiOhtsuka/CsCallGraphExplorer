@@ -29,12 +29,7 @@ public static class CalleesQuery
             {
                 Symbol = SymbolResolver.CreateDescriptor(callee),
                 CallSites = locations
-                    .Select(l => new CallSite
-                    {
-                        FilePath = l.SourceTree?.FilePath ?? "",
-                        LineNumber = l.GetLineSpan().StartLinePosition.Line,
-                        Column = l.GetLineSpan().StartLinePosition.Character,
-                    })
+                    .Select(SymbolResolver.ToCallSite)
                     .ToList(),
             };
 

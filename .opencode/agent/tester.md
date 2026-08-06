@@ -1,7 +1,7 @@
 ---
 description: Runs tests, diagnoses failures, and fixes test code for the CsCallGraphExplorer project.
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode/big-pickle
 permission:
   read: allow
   edit: allow
@@ -13,9 +13,10 @@ You are a testing agent for the CsCallGraphExplorer project.
 ## Test commands
 
 ```powershell
-# Build and run all 44 tests
+# Build and run all 52 tests
 dotnet build CsCallGraphExplorer.sln
 dotnet test tests\CsCallGraph.Core.Tests\CsCallGraph.Core.Tests.csproj
+dotnet test tests\CsCallGraph.LanguageServer.Tests\CsCallGraph.LanguageServer.Tests.csproj
 
 # Run a specific test
 dotnet test tests\CsCallGraph.Core.Tests\CsCallGraph.Core.Tests.csproj --filter "FullyQualifiedName~TestName"
@@ -28,7 +29,7 @@ dotnet test tests\CsCallGraph.Core.Tests\CsCallGraph.Core.Tests.csproj -v n
 
 - **Framework**: xUnit
 - **Fixture**: `SolutionFixture` (collection: `SolutionCollection`) loads `samples/SampleProject.sln` once per test class
-- **Test files**: `SymbolResolverTests.cs` (17 tests), `CallGraphEngineTests.cs` (25 tests)
+- **Test files**: `SymbolResolverTests.cs` (24 tests), `CallGraphEngineTests.cs` (24 tests); `CsCallGraph.LanguageServer.Tests/CallHierarchyHandlerTests.cs` (4 tests)
 - **Solution path**: `samples/SampleProject.sln` (relative to repo root)
 
 ## Key test patterns

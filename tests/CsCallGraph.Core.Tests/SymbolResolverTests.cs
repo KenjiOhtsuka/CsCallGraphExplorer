@@ -144,6 +144,57 @@ public class SymbolResolverTests
     }
 
     [Fact]
+    public void CreateDescriptor_DeclarationLocations_HaveFullSpan()
+    {
+        var desc = ResolveDescriptor("SampleLibrary.PublicMethods.InstanceMethod");
+
+        var loc = Assert.Single(desc.DeclarationLocations);
+        Assert.Equal(4, loc.LineNumber);
+        Assert.Equal(4, loc.Column);
+        Assert.Equal(8, loc.EndLineNumber);
+        Assert.True(loc.EndColumn > loc.Column);
+    }
+
+    [Fact]
+    public void CreateDescriptor_IdentifierLocations_PointsToMethodName()
+    {
+        var desc = ResolveDescriptor("SampleLibrary.PublicMethods.InstanceMethod");
+
+        var loc = Assert.Single(desc.IdentifierLocations);
+        Assert.Equal(4, loc.LineNumber);
+        Assert.Equal(16, loc.Column);
+        Assert.Equal(4, loc.EndLineNumber);
+        Assert.Equal(30, loc.EndColumn);
+    }
+
+    [Fact]
+    public void CreateDescriptor_IdentifierLocations_StaticMethodName()
+    {
+        var desc = ResolveDescriptor("SampleLibrary.PublicMethods.StaticMethod");
+
+        var loc = Assert.Single(desc.IdentifierLocations);
+        Assert.Equal(10, loc.LineNumber);
+        Assert.Equal(23, loc.Column);
+        Assert.Equal(35, loc.EndColumn);
+    }
+
+    [Fact]
+    public void CreateDescriptor_IdentifierLocations_FieldAndProperty()
+    {
+        var field = ResolveDescriptor("SampleLibrary.FieldsAndProperties.InstanceField");
+        var fieldLoc = Assert.Single(field.IdentifierLocations);
+        Assert.Equal(5, fieldLoc.LineNumber);
+        Assert.Equal(15, fieldLoc.Column);
+        Assert.Equal(28, fieldLoc.EndColumn);
+
+        var prop = ResolveDescriptor("SampleLibrary.FieldsAndProperties.AutoProperty");
+        var propLoc = Assert.Single(prop.IdentifierLocations);
+        Assert.Equal(16, propLoc.LineNumber);
+        Assert.Equal(15, propLoc.Column);
+        Assert.Equal(27, propLoc.EndColumn);
+    }
+
+    [Fact]
     public async Task CreateDescriptor_LocalFunction_HasLocalFunctionKind()
     {
         var engine = new CallGraphEngine();

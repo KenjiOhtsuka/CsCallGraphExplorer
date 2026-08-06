@@ -23,7 +23,8 @@ CsCallGraphExplorer/
 ├── extensions/
 │   └── vscode/                         # VS Code extension       ✅ Done
 ├── tests/
-│   ├── CsCallGraph.Core.Tests/         # xUnit tests             ✅ 44 tests
+│   ├── CsCallGraph.Core.Tests/         # xUnit tests             ✅ 48 tests
+│   ├── CsCallGraph.LanguageServer.Tests/ # LSP handler tests      ✅ 4 tests
 │   └── CsCallGraph.Cli.Tests/          # CLI process tests       ❌ Not started
 ├── samples/
 │   ├── SampleProject.sln               # Standalone solution     ✅
@@ -41,6 +42,7 @@ CsCallGraphExplorer/
 CsCallGraph.Cli ──────────┐
                           ├──> CsCallGraph.Core ──> Microsoft.CodeAnalysis.Workspaces
 CsCallGraph.LanguageServer ┘
+                          └──> CsCallGraph.LanguageServer.Tests ──> samples/ (fixture)
                                       samples/
 ├── CsCallGraph.Core.Tests ────────┘    └── SampleConsoleApp (fixture)
 └── CLI tests (process invocations) ──── reference via file path
@@ -57,6 +59,7 @@ Contains all tool components and their tests:
 - `src/CsCallGraph.Cli/CsCallGraph.Cli.csproj`
 - `src/CsCallGraph.LanguageServer/CsCallGraph.LanguageServer.csproj` (added later)
 - `tests/CsCallGraph.Core.Tests/CsCallGraph.Core.Tests.csproj`
+- `tests/CsCallGraph.LanguageServer.Tests/CsCallGraph.LanguageServer.Tests.csproj`
 
 ### Sample Solution: `samples/SampleProject.sln`
 

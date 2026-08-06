@@ -49,12 +49,7 @@ public static class CallersQuery
             Symbol = SymbolResolver.CreateDescriptor(symbol),
             CallSites = locations
                 .Where(l => l.IsInSource)
-                .Select(l => new CallSite
-                {
-                    FilePath = l.SourceTree?.FilePath ?? "",
-                    LineNumber = l.GetLineSpan().StartLinePosition.Line,
-                    Column = l.GetLineSpan().StartLinePosition.Character,
-                })
+                .Select(SymbolResolver.ToCallSite)
                 .ToList(),
         };
     }

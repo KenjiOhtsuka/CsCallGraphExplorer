@@ -139,6 +139,9 @@ public class CallGraphEngineTests
             {
                 Assert.NotEmpty(cs.FilePath);
                 Assert.True(cs.LineNumber >= 0);
+                Assert.True(cs.Column >= 0);
+                Assert.True(cs.EndLineNumber >= cs.LineNumber);
+                Assert.True(cs.EndColumn >= 0);
             });
         }
     }

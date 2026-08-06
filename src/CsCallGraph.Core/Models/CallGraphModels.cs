@@ -39,6 +39,8 @@ public class CallSite
     public string FilePath { get; init; } = "";
     public int LineNumber { get; init; }
     public int Column { get; init; }
+    public int EndLineNumber { get; init; }
+    public int EndColumn { get; init; }
 }
 
 public class SymbolDescriptor
@@ -52,6 +54,7 @@ public class SymbolDescriptor
     public int Arity { get; init; }
     public List<ParameterInfo> Parameters { get; init; } = [];
     public List<CallSite> DeclarationLocations { get; init; } = [];
+    public List<CallSite> IdentifierLocations { get; init; } = [];
     public string DisplayString { get; init; } = "";
 }
 

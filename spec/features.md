@@ -108,4 +108,4 @@ Items acknowledged as valid but deferred for later resolution:
 | 6 | **TESTING.md** | Troubleshooting refers to `pnpm compile` instead of `npm run compile` | Minor | **Fixed** in PR #16 |
 | 7 | **LspModels.cs** | Advertises `TextDocumentSync.Full` (1) but server does not consume `didOpen`/`didChange` events; should be `None` (0) | Minor | Deferred |
 | 8 | **CallGraphEngine.cs** | Cache `Lazy<Task<...>>` factory captures caller's `CancellationToken`; on cancellation/retry, entry not evicted | Minor | Deferred |
-| 9 | **CallHierarchyHandler.cs** | `ToLspItem`/`ToIncomingCall`/`ToOutgoingCall` range/selectionRange correctness for declaration vs call-site positions | Minor | Deferred |
+| 9 | **CallHierarchyHandler.cs** | `ToLspItem`/`ToIncomingCall`/`ToOutgoingCall` range/selectionRange correctness for declaration vs call-site positions | Minor | **Fixed** in PR #21 — items use declaration file + full-span `range` + identifier `selectionRange`; call-site positions only in `FromRanges` |

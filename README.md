@@ -211,6 +211,7 @@ samples/
   SampleLibrary/                  — C# library with constructs
   SampleConsoleApp/               — Console app exercising the library
 tests/
-  CsCallGraph.Core.Tests/         — Unit tests (xUnit, 44 tests)
+  CsCallGraph.Core.Tests/         — Unit tests (xUnit, 48 tests)
+  CsCallGraph.LanguageServer.Tests/ — LSP handler tests (xUnit, 4 tests)
 spec/                             — Design documents
 ```
