@@ -10,7 +10,7 @@ class LspClient {
   private _child?: cp.ChildProcess;
   private _msgId = 1;
   private _pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>();
-  private _buffer = '';
+  private _buffer = Buffer.alloc(0);
 
   get isRunning(): boolean {
     return !!this._child && !this._child.killed;
@@ -65,16 +65,17 @@ class LspClient {
   }
 
   private _onData(chunk: Buffer): void {
-    this._buffer += chunk.toString();
+    this._buffer = Buffer.concat([this._buffer, chunk]);
     while (true) {
-      const match = this._buffer.match(/Content-Length: (\d+)\r\n\r\n/);
+      const sep = this._buffer.indexOf('\r\n\r\n');
+      if (sep === -1) break;
+      const match = /Content-Length: (\d+)/.exec(this._buffer.subarray(0, sep).toString('utf8'));
       if (!match) break;
-      const headerLen = match[0].length;
       const bodyLen = parseInt(match[1], 10);
-      if (this._buffer.length < headerLen + bodyLen) break;
+      if (this._buffer.length < sep + 4 + bodyLen) break;
 
-      const body = this._buffer.slice(headerLen, headerLen + bodyLen);
-      this._buffer = this._buffer.slice(headerLen + bodyLen);
+      const body = this._buffer.subarray(sep + 4, sep + 4 + bodyLen).toString('utf8');
+      this._buffer = Buffer.from(this._buffer.subarray(sep + 4 + bodyLen));
 
       try {
         const msg = JSON.parse(body);
