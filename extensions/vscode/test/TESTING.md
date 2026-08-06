@@ -20,7 +20,7 @@ Output goes to `extensions/vscode/out/extension.js`.
 
 ## 2. Test the LSP server manually (without VS Code)
 
-You can send raw LSP messages to the language server via PowerShell to verify it works:
+You can send raw LSP messages to the language server via PowerShell to verify it works.
 
 ### Start the server
 
@@ -29,20 +29,32 @@ You can send raw LSP messages to the language server via PowerShell to verify it
 dotnet run --project src\CsCallGraph.LanguageServer -- --solution samples\SampleProject.sln
 ```
 
+### Send frames with the helper below
+
+`Content-Length` is the **UTF-8 byte count** of the JSON body, not the character count.
+The `Send-Lsp` helper below computes it automatically, so the frames are always correct:
+
+```powershell
+function Send-Lsp {
+  param([string]$Body)
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($Body)
+  $frame = "Content-Length: $($bytes.Length)`r`n`r`n$Body"
+  $frame
+  $frame | & dotnet run --project src\CsCallGraph.LanguageServer -- --solution samples\SampleProject.sln
+}
+```
+
+> Pipe one request per invocation — the server reads a single frame and exits at EOF.
+> For reference: the `initialize` body below is **107 bytes** (`Content-Length: 107`).
+
 ### Send an initialize request
 
-Copy-paste this entire block into the running server's terminal (stdin):
-
-```json
-Content-Length: 81
-
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":null,"capabilities":{}}}
+```powershell
+Send-Lsp '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":null,"capabilities":{}}}'
 ```
 
 Expected response:
 ```json
-Content-Length: XXX
-
 {"jsonrpc":"2.0","id":1,"result":{"capabilities":{"textDocumentSync":1,"callHierarchyProvider":true}}}
 ```
 
@@ -50,37 +62,40 @@ Content-Length: XXX
 
 With the server still running, send:
 
-```json
-Content-Length: 151
-
-{"jsonrpc":"2.0","id":2,"method":"textDocument/prepareCallHierarchy","params":{"textDocument":{"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs"},"position":{"line":37,"character":8}}}
+```powershell
+Send-Lsp '{"jsonrpc":"2.0","id":2,"method":"textDocument/prepareCallHierarchy","params":{"textDocument":{"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs"},"position":{"line":37,"character":22}}}'
 ```
 
-Replace the file path with your actual absolute path. `line` and `character` are 0-based.
+Replace the file path with your actual absolute path. `line` and `character` are 0-based;
+`37:22` points at the `StaticMethod` identifier on 1-based line 38 (chars 8–20 are the
+`PublicMethods` type name, which resolves to the *type* instead of the method).
 
 ### Send incomingCalls (callers)
 
-```json
-Content-Length: 181
+```powershell
+Send-Lsp '{"jsonrpc":"2.0","id":3,"method":"callHierarchy/incomingCalls","params":{"item":{"name":"StaticMethod","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs","range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"selectionRange":{"start":{"line":36,"character":0},"end":{"line":36,"character":0}},"data":"SampleLibrary.PublicMethods.StaticMethod(string)"}}}'
+```
 
-{"jsonrpc":"2.0","id":3,"method":"callHierarchy/incomingCalls","params":{"item":{"name":"CallStaticMethod","kind":6,"uri":"file:///...","range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"selectionRange":{"start":{"line":36,"character":0},"end":{"line":36,"character":0}},"data":"SampleConsoleApp.Callers.CallStaticMethod"}}}
+`data` is copied verbatim from the item returned by prepareCallHierarchy.
+
+### Send outgoingCalls (callees)
+
+```powershell
+Send-Lsp '{"jsonrpc":"2.0","id":4,"method":"callHierarchy/outgoingCalls","params":{"item":{"name":"RunAll","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs","range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"selectionRange":{"start":{"line":12,"character":0},"end":{"line":12,"character":0}},"data":"SampleConsoleApp.Callers.RunAll"}}}'
 ```
 
 ### Shutdown
 
-```json
-Content-Length: 50
-
-{"jsonrpc":"2.0","id":4,"method":"shutdown","params":null}
+```powershell
+Send-Lsp '{"jsonrpc":"2.0","id":5,"method":"shutdown","params":null}'
 ```
 
-```json
-Content-Length: 32
-
-{"jsonrpc":"2.0","method":"exit"}
+```powershell
+Send-Lsp '{"jsonrpc":"2.0","method":"exit"}'
 ```
 
-> **Tip:** Pipe test messages from a file: `Get-Content test-request.txt | dotnet run --project src\CsCallGraph.LanguageServer -- --solution samples\SampleProject.sln`
+> **Tip:** Pipe test messages from a file:
+> `Get-Content test-request.txt | dotnet run --project src\CsCallGraph.LanguageServer -- --solution samples\SampleProject.sln`
 
 ## 3. Test the VS Code extension
 
@@ -136,8 +151,9 @@ When the extension is updated to use LSP instead of shell-out:
 | Problem | Likely fix |
 |---|---|
 | `dotnet` command not found | Install .NET 10 SDK |
-| Extension not activating | Check `pnpm compile` succeeded; check VS Code Developer Tools console (Help > Toggle Developer Tools) |
+| Extension not activating | Check `npm run compile` succeeded; check VS Code Developer Tools console (Help > Toggle Developer Tools) |
 | LSP server crashes silently | Run it manually (section 2) to see error output |
 | "No .sln file found" | Set `csCallGraph.solutionPath` in settings |
-| Symbol not resolved | Check `line` and `character` are 0-based in the source file |
+| Symbol not resolved | Check `line` and `character` are 0-based and point inside the method-name identifier |
+| LSP frame malformed / server stalls | Use `Send-Lsp` (section 2) so `Content-Length` is computed from UTF-8 byte count |
 | Slow response (~30s) | First load — Roslyn is parsing the solution. Subsequent calls are faster if using LSP |
