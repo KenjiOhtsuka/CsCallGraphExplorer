@@ -46,9 +46,9 @@ Both projects are in the same solution (`SampleProject.sln`). This lets integrat
 | File | Elements | Modifiers |
 |---|---|---|
 | `PublicMethods.cs` | Instance method, static method, method with ref/out, method returning void | `public`, `private`, `internal`, `protected` |
-| `CtorsAndStatics.cs` | Instance constructor, static constructor, constructor chaining (`: this()`, `: base()`) | `public`, `static` |
+| `CtorsAndStatics.cs` | Instance constructor, static constructor, constructor chaining (`: this()`) | `public`, `static` |
 | `Overloads.cs` | Overloaded methods by parameter count, type, and ref-kind | `public` |
-| `Inheritance.cs` | Virtual method, override, interface method implementation, `base.Method()` call | `public`, `virtual`, `override` |
+| `Inheritance.cs` | Virtual method, override, interface method implementation, `base.Method()` call, constructor chaining (`: base()`) | `public`, `virtual`, `override` |
 | `Generics.cs` | Generic method `<T>`, generic class `<TKey, TValue>`, constraints | `public` |
 | `LambdasAndDelegates.cs` | Lambda assigned to `Func<>`, delegate declaration + invocation, local function, anonymous method | — |
 | `AsyncStuff.cs` | `async Task`, `async Task<T>`, `async void` (event handler), `ValueTask` | `public`, `async` |
@@ -85,8 +85,9 @@ Each element in the sample must produce a predictable call graph that tests veri
 | `SampleLibrary.PublicMethods.InstanceMethod` | `CallInstanceMethod`, `CallPrivate` | `PrivateMethod` | ✅ |
 | `SampleLibrary.PublicMethods.StaticMethod` | `InstanceMethod`, `CallStaticMethod`, `ExtraCaller` | — | ✅ |
 | `SampleLibrary.CtorsAndStatics..ctor` | `new` in `CallConstructors` | `: this()` chain | ✅ |
+| `SampleLibrary.DerivedClass..ctor` | — | `: base()` → `BaseClass..ctor` | ✅ |
 | `SampleLibrary.LambdasAndDelegates.LocalFunctionExample` | `CallDelegates` | `Multiply` (local function) | ✅ |
-| `SampleLibrary.Inheritance.DerivedClass.Greet` | `CallInheritance`, `Greet` (base call) | `Greet` (base) | ✅ |
+| `SampleLibrary.DerivedClass.Greet` | `CallInheritance`, `Greet` (base call) | `Greet` (base) | ✅ |
 | `SampleConsoleApp.Callers.RunAll` | entry point | all category methods | ✅ |
 
 ## Usage in Tests

@@ -251,6 +251,52 @@ public class CallGraphEngineTests
         Assert.Equal(".ctor", result.Target.Name);
     }
 
+    #endregion
+
+    #region Constructor Chaining
+
+    [Fact]
+    public async Task GetCallees_ThisInitializer_RecordsChainedConstructor()
+    {
+        var result = await _engine.GetCalleesAsync(
+            _fixture.SolutionPath,
+            "SampleLibrary.CtorsAndStatics..ctor()");
+
+        Assert.Contains(result.Roots, r =>
+            r.Symbol.Name == ".ctor" &&
+            r.Symbol.ContainingType == "SampleLibrary.CtorsAndStatics" &&
+            r.Symbol.Parameters.Count == 1 &&
+            r.Symbol.Parameters[0].TypeName == "string");
+    }
+
+    [Fact]
+    public async Task GetCallees_BaseInitializer_RecordsBaseConstructor()
+    {
+        var result = await _engine.GetCalleesAsync(
+            _fixture.SolutionPath,
+            "SampleLibrary.DerivedClass..ctor()");
+
+        Assert.Contains(result.Roots, r =>
+            r.Symbol.Name == ".ctor" &&
+            r.Symbol.ContainingType == "SampleLibrary.BaseClass" &&
+            r.Symbol.Parameters.Count == 1 &&
+            r.Symbol.Parameters[0].TypeName == "string");
+    }
+
+    [Fact]
+    public async Task GetCallers_BaseConstructor_ReturnsDerivedCtorInitializer()
+    {
+        var result = await _engine.GetCallersAsync(
+            _fixture.SolutionPath,
+            "SampleLibrary.BaseClass..ctor(string)");
+
+        Assert.Contains(result.Roots, r =>
+            r.Symbol.Name == ".ctor" &&
+            r.Symbol.ContainingType == "SampleLibrary.DerivedClass");
+    }
+
+    #endregion
+
     [Fact]
     public async Task GetCallers_StaticClassMethod_ReturnsCallers()
     {
@@ -284,8 +330,6 @@ public class CallGraphEngineTests
         Assert.NotNull(result);
         Assert.Equal("Swap", result.Target.Name);
     }
-
-    #endregion
 
     #region Error Handling
 

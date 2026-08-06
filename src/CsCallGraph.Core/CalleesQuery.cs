@@ -85,6 +85,15 @@ public static class CalleesQuery
                 AddToMap(calleeMap, info.Symbol, creation.GetLocation());
             }
 
+            // Constructor initializer calls (: this(...) / : base(...))
+            foreach (var initializer in containingMember.DescendantNodes()
+                .OfType<ConstructorInitializerSyntax>())
+            {
+                var info = semanticModel.GetSymbolInfo(initializer, ct);
+                if (info.Symbol == null) continue;
+                AddToMap(calleeMap, info.Symbol, initializer.GetLocation());
+            }
+
             // Property/event accesses (excluding those inside invocations/creations)
             foreach (var memberAccess in containingMember.DescendantNodes()
                 .OfType<MemberAccessExpressionSyntax>())
