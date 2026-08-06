@@ -69,9 +69,9 @@ public static class SymbolResolver
     private static List<CallSite> GetDeclarationLocations(ISymbol symbol)
     {
         var syntaxLocs = symbol.DeclaringSyntaxReferences
-            .Select(r => r.GetSyntax().GetLocation())
-            .Where(l => l.IsInSource)
-            .Select(ToCallSite)
+            .Select(r => r.GetSyntax() is { } node ? node.GetLocation() : null)
+            .Where(l => l != null)
+            .Select(l => ToCallSite(l!))
             .ToList();
         if (syntaxLocs.Count > 0) return syntaxLocs;
 
@@ -100,12 +100,15 @@ public static class SymbolResolver
         if (token is not { } id || id.Span.IsEmpty)
             return [];
 
-        var lineSpan = id.SyntaxTree.GetLineSpan(id.Span);
+        var tree = id.SyntaxTree;
+        if (tree == null) return [];
+
+        var lineSpan = tree.GetLineSpan(id.Span);
         return
         [
             new CallSite
             {
-                FilePath = id.SyntaxTree.FilePath,
+                FilePath = tree.FilePath,
                 LineNumber = lineSpan.StartLinePosition.Line,
                 Column = lineSpan.StartLinePosition.Character,
                 EndLineNumber = lineSpan.EndLinePosition.Line,
@@ -132,6 +135,8 @@ public static class SymbolResolver
                 case RecordDeclarationSyntax r: return r.Identifier;
                 case TypeDeclarationSyntax t: return t.Identifier;
                 case EnumDeclarationSyntax e: return e.Identifier;
+                case EnumMemberDeclarationSyntax em: return em.Identifier;
+                case ConversionOperatorDeclarationSyntax co: return co.OperatorKeyword;
                 case DelegateDeclarationSyntax d: return d.Identifier;
                 default: continue;
             }

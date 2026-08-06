@@ -25,6 +25,10 @@ public class JsonFormatter : IOutputFormatter
 
     private static JsonTarget MapDescriptor(SymbolDescriptor desc, CallDirection dir)
     {
+        var locations = desc.IdentifierLocations.Count > 0
+            ? desc.IdentifierLocations
+            : desc.DeclarationLocations;
+
         return new JsonTarget
         {
             Name = desc.Name,
@@ -41,7 +45,7 @@ public class JsonFormatter : IOutputFormatter
                 IsRef = p.IsRef,
                 IsOut = p.IsOut,
             }).ToList(),
-            DeclarationLocations = desc.DeclarationLocations.Select(l => new JsonLocation
+            DeclarationLocations = locations.Select(l => new JsonLocation
             {
                 File = l.FilePath,
                 Line = l.LineNumber + 1,

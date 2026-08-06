@@ -50,7 +50,7 @@ public class CallHierarchyHandler : IDisposable
         if (symbol == null) return Result(msg.Id, Array.Empty<CallHierarchyIncomingCall>());
 
         var result = _engine.GetCallersAsync(_solutionPath, symbol).GetAwaiter().GetResult();
-        var calls = result.Roots.Select(ToIncomingCall).ToArray();
+        var calls = result.Roots.Select(ToIncomingCall).OfType<CallHierarchyIncomingCall>().ToArray();
         return new JsonRpcMessage
         {
             Id = msg.Id,
@@ -66,7 +66,7 @@ public class CallHierarchyHandler : IDisposable
         if (symbol == null) return Result(msg.Id, Array.Empty<CallHierarchyOutgoingCall>());
 
         var result = _engine.GetCalleesAsync(_solutionPath, symbol).GetAwaiter().GetResult();
-        var calls = result.Roots.Select(ToOutgoingCall).ToArray();
+        var calls = result.Roots.Select(ToOutgoingCall).OfType<CallHierarchyOutgoingCall>().ToArray();
         return new JsonRpcMessage
         {
             Id = msg.Id,
@@ -97,30 +97,26 @@ public class CallHierarchyHandler : IDisposable
         };
     }
 
-    private static CallHierarchyIncomingCall ToIncomingCall(CallGraphNode node)
+    private static CallHierarchyIncomingCall? ToIncomingCall(CallGraphNode node)
     {
+        var from = ToLspItem(node.Symbol);
+        if (from == null) return null;
+
         return new CallHierarchyIncomingCall
         {
-            From = ToLspItem(node.Symbol) ?? new CallHierarchyItem
-            {
-                Name = node.Symbol.DisplayString,
-                Kind = ToLspSymbolKind(node.Symbol.Kind),
-                Data = node.Symbol.FullyQualifiedName,
-            },
+            From = from,
             FromRanges = node.CallSites.Select(ToRange).ToArray(),
         };
     }
 
-    private static CallHierarchyOutgoingCall ToOutgoingCall(CallGraphNode node)
+    private static CallHierarchyOutgoingCall? ToOutgoingCall(CallGraphNode node)
     {
+        var to = ToLspItem(node.Symbol);
+        if (to == null) return null;
+
         return new CallHierarchyOutgoingCall
         {
-            To = ToLspItem(node.Symbol) ?? new CallHierarchyItem
-            {
-                Name = node.Symbol.DisplayString,
-                Kind = ToLspSymbolKind(node.Symbol.Kind),
-                Data = node.Symbol.FullyQualifiedName,
-            },
+            To = to,
             FromRanges = node.CallSites.Select(ToRange).ToArray(),
         };
     }

@@ -1,7 +1,7 @@
 ---
 description: Reviews C# code in the CsCallGraphExplorer project for correctness, performance, and Roslyn best practices.
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: opencode/big-pickle
 permission:
   read: allow
   edit: deny
@@ -19,7 +19,7 @@ You are a code reviewer for the CsCallGraphExplorer project. The project is a ca
 - **Only `Microsoft.CodeAnalysis.*` NuGet dependencies** (plus test SDKs)
 - **Exact-match symbol names** — no fuzzy resolution
 - **Structured JSON errors on stderr** — with exit codes 0/1/2/3
-- **44 xUnit tests** in `tests/CsCallGraph.Core.Tests/`
+- **48 xUnit tests** in `tests/CsCallGraph.Core.Tests/` (+ 4 in `tests/CsCallGraph.LanguageServer.Tests/`)
 
 ## Review focus areas
 
