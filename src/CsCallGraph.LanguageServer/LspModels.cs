@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace CsCallGraph.LanguageServer;
@@ -24,6 +25,31 @@ public class JsonRpcId
 
     public static implicit operator JsonRpcId(long id) => new() { IntVal = id };
     public static implicit operator JsonRpcId(string id) => new() { StrVal = id };
+}
+
+public class JsonRpcIdConverter : JsonConverter<JsonRpcId>
+{
+    public override JsonRpcId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+            return new JsonRpcId { StrVal = reader.GetString() };
+
+        if (reader.TokenType == JsonTokenType.Number)
+        {
+            if (reader.TryGetInt64(out var intVal))
+                return new JsonRpcId { IntVal = intVal };
+            throw new JsonException("JSON-RPC id must be an integer or a string.");
+        }
+
+        throw new JsonException($"Unexpected token {reader.TokenType} for JSON-RPC id.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, JsonRpcId value, JsonSerializerOptions options)
+    {
+        if (value.IntVal.HasValue) writer.WriteNumberValue(value.IntVal.Value);
+        else if (value.StrVal != null) writer.WriteStringValue(value.StrVal);
+        else writer.WriteNullValue();
+    }
 }
 
 public class JsonRpcError
