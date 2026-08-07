@@ -60,12 +60,43 @@ public static class CalleesQuery
             var semanticModel = await document.GetSemanticModelAsync(ct);
             if (semanticModel == null) continue;
 
-            var containingMember = root.FindToken(loc.SourceSpan.Start).Parent?
+            var tokenParent = root.FindToken(loc.SourceSpan.Start).Parent;
+            var containingMember = tokenParent?
                 .AncestorsAndSelf().OfType<BaseMethodDeclarationSyntax>().FirstOrDefault()
-                ?? root.FindToken(loc.SourceSpan.Start).Parent?
+                ?? tokenParent?
                 .AncestorsAndSelf().OfType<AccessorDeclarationSyntax>().FirstOrDefault()
                 as SyntaxNode;
+
+            // Primary constructors (C# 12 records/classes) have no method or accessor
+            // declaration; fall back to the enclosing type declaration. Exclude
+            // implicitly-declared constructors (e.g. the record copy constructor),
+            // which share the primary constructor's location but are not in source.
+            if (containingMember == null
+                && target is IMethodSymbol { MethodKind: MethodKind.Constructor }
+                && !target.IsImplicitlyDeclared)
+            {
+                containingMember = tokenParent?
+                    .AncestorsAndSelf().OfType<TypeDeclarationSyntax>().FirstOrDefault();
+            }
+
             if (containingMember == null) continue;
+
+            // Primary constructor scope: the base list is the only callee source.
+            if (containingMember is TypeDeclarationSyntax typeDecl)
+            {
+                if (typeDecl.BaseList is { } baseList)
+                {
+                    foreach (var primaryBase in baseList.Types
+                        .OfType<PrimaryConstructorBaseTypeSyntax>())
+                    {
+                        var info = semanticModel.GetSymbolInfo(primaryBase, ct);
+                        var symbol = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
+                        if (symbol == null) continue;
+                        AddToMap(calleeMap, symbol, primaryBase.GetLocation());
+                    }
+                }
+                continue;
+            }
 
             // Method calls
             foreach (var invocation in containingMember.DescendantNodes()
@@ -83,6 +114,15 @@ public static class CalleesQuery
                 var info = semanticModel.GetSymbolInfo(creation, ct);
                 if (info.Symbol == null) continue;
                 AddToMap(calleeMap, info.Symbol, creation.GetLocation());
+            }
+
+            // Constructor initializer calls (: this(...) / : base(...))
+            foreach (var initializer in containingMember.DescendantNodes()
+                .OfType<ConstructorInitializerSyntax>())
+            {
+                var info = semanticModel.GetSymbolInfo(initializer, ct);
+                if (info.Symbol == null) continue;
+                AddToMap(calleeMap, info.Symbol, initializer.GetLocation());
             }
 
             // Property/event accesses (excluding those inside invocations/creations)

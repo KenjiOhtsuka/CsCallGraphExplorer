@@ -7,6 +7,13 @@ public interface IProcessor
 
 public class BaseClass
 {
+    public string Label { get; }
+
+    public BaseClass(string label)
+    {
+        Label = label;
+    }
+
     public virtual string Greet(string name)
     {
         return $"Hello, {name}";
@@ -19,6 +26,10 @@ public class BaseClass
 
 public class DerivedClass : BaseClass, IProcessor
 {
+    public DerivedClass() : base("derived")
+    {
+    }
+
     public override string Greet(string name)
     {
         var baseResult = base.Greet(name);

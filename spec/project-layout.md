@@ -23,8 +23,8 @@ CsCallGraphExplorer/
 ├── extensions/
 │   └── vscode/                         # VS Code extension       ✅ Done
 ├── tests/
-│   ├── CsCallGraph.Core.Tests/         # xUnit tests             ✅ 48 tests
-│   ├── CsCallGraph.LanguageServer.Tests/ # LSP handler tests      ✅ 4 tests
+│   ├── CsCallGraph.Core.Tests/         # xUnit tests             ✅ 55 tests
+│   ├── CsCallGraph.LanguageServer.Tests/ # LSP handler tests      ✅ 5 tests
 │   └── CsCallGraph.Cli.Tests/          # CLI process tests       ❌ Not started
 ├── samples/
 │   ├── SampleProject.sln               # Standalone solution     ✅
