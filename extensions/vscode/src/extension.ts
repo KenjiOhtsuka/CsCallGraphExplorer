@@ -88,6 +88,8 @@ class LspClient {
 
   private _send(msg: any): void {
     const json = JSON.stringify(msg);
+    const label = msg.id != null ? `id ${msg.id}` : 'notify';
+    this._log(`[LSP send] ${msg.method ?? '?'} (${label}) ${json.slice(0, 400)}`);
     const header = `Content-Length: ${Buffer.byteLength(json, 'utf8')}\r\n\r\n`;
     this._child?.stdin?.write(header + json);
   }
