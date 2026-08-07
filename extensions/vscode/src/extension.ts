@@ -6,11 +6,15 @@ import * as fs from 'fs';
 // ---------------------------------------------------------------------------
 // Lightweight LSP client — JSON-RPC over stdin/stdout
 // ---------------------------------------------------------------------------
+type LogFn = (line: string) => void;
+
 class LspClient {
   private _child?: cp.ChildProcess;
   private _msgId = 1;
   private _pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>();
   private _buffer = Buffer.alloc(0);
+
+  constructor(private _log: LogFn = () => {}) {}
 
   get isRunning(): boolean {
     return !!this._child && !this._child.killed;
@@ -18,22 +22,34 @@ class LspClient {
 
   start(command: string, args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
+      this._log(`[LSP] spawn: ${command} ${args.join(' ')}`);
       this._child = cp.spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
 
       this._child.stdout!.on('data', (chunk: Buffer) => this._onData(chunk));
       this._child.stderr!.on('data', (chunk: Buffer) => {
-        console.error('[LSP stderr]', chunk.toString());
+        const text = chunk.toString();
+        for (const line of text.split(/\r?\n/)) {
+          const trimmed = line.trim();
+          if (trimmed.length > 0) this._log(`[LSP stderr] ${trimmed}`);
+        }
       });
       this._child.on('exit', (code) => {
-        console.log('[LSP] exited with code', code);
+        this._log(`[LSP] exited with code ${code}`);
       });
-      this._child.on('error', reject);
+      this._child.on('error', (err) => {
+        this._log(`[LSP] spawn error: ${err.message}`);
+        reject(err);
+      });
 
+      const t0 = Date.now();
       this.request('initialize', {
         processId: process.pid,
         rootUri: null,
         capabilities: {}
-      }).then(() => resolve(), reject);
+      }).then(() => {
+        this._log(`[LSP] initialize OK in ${Date.now() - t0} ms`);
+        resolve();
+      }, reject);
     });
   }
 
@@ -48,13 +64,25 @@ class LspClient {
 
   request(method: string, params: any): Promise<any> {
     const id = this._msgId++;
+    const t0 = Date.now();
+    this._log(`[LSP ->] ${method} (id ${id})`);
     return new Promise((resolve, reject) => {
-      this._pending.set(id, { resolve, reject });
+      this._pending.set(id, {
+        resolve: (v: any) => {
+          this._log(`[LSP <-] ${method} (id ${id}) in ${Date.now() - t0} ms`);
+          resolve(v);
+        },
+        reject: (e: any) => {
+          this._log(`[LSP <-] ${method} (id ${id}) ERROR in ${Date.now() - t0} ms: ${e.message}`);
+          reject(e);
+        },
+      });
       this._send({ jsonrpc: '2.0', id, method, params });
     });
   }
 
   notify(method: string, params?: any): void {
+    this._log(`[LSP ->] ${method} (notify)`);
     this._send({ jsonrpc: '2.0', method, params });
   }
 
@@ -127,6 +155,14 @@ export async function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel('CsCallGraph');
   context.subscriptions.push(outputChannel);
 
+  const debugEnabled =
+    process.env.CSCALLGRAPH_LSP_DEBUG === 'true' ||
+    vscode.workspace.getConfiguration('csCallGraph').get<boolean>('debugLogging', false) === true;
+  const log: LogFn = (line) => {
+    if (debugEnabled) outputChannel.appendLine(line);
+  };
+  outputChannel.appendLine(`[CsCallGraph] LSP debug logging: ${debugEnabled ? 'ON' : 'OFF'}`);
+
   const slnPath = await resolveSolutionPath();
   if (!slnPath) {
     outputChannel.appendLine('[CsCallGraph] No .sln file found.');
@@ -153,7 +189,7 @@ export async function activate(context: vscode.ExtensionContext) {
     args = ['run', '--project', lspProject, '--', '--solution', slnPath];
   }
 
-  lspClient = new LspClient();
+  lspClient = new LspClient(log);
   try {
     await lspClient.start(command, args);
     outputChannel.appendLine('[CsCallGraph] LSP server started.');
@@ -364,14 +400,17 @@ async function showInOutputPanel(
     textDocument: { uri: editor.document.uri.toString() },
     position: { line: pos.line, character: pos.character },
   };
+  channel.appendLine(`[Query] ${direction} at ${editor.document.fileName}:${pos.line + 1}:${pos.character + 1} (0-based ${pos.line}:${pos.character})`);
   const items: LspCallHierarchyItem[] = await client.request('textDocument/prepareCallHierarchy', params);
   if (!items || items.length === 0) {
     channel.appendLine('No symbol found at cursor.');
+    channel.appendLine(`[Hint] The cursor was at line ${pos.line + 1}, column ${pos.character + 1}. Click directly on the method name (not the parentheses/arguments) and re-run.`);
     channel.show();
     return;
   }
 
   const data = items[0].data ?? items[0].detail ?? items[0].name;
+  channel.appendLine(`[Resolved] ${data}`);
   const method = direction === 'callers' ? 'callHierarchy/incomingCalls' : 'callHierarchy/outgoingCalls';
 
   const itemKey = { data: items[0].data };

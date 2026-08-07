@@ -68,6 +68,11 @@
           "default": 10,
           "description": "Maximum depth (0 = unlimited)"
         },
+        "csCallGraph.debugLogging": {
+          "type": "boolean",
+          "default": true,
+          "description": "Log LSP requests/responses and server stderr to the CsCallGraph output panel"
+        },
         "csCallGraph.searchScope": {
           "type": "string",
           "enum": ["solution", "project", "project-with-dependencies"],
