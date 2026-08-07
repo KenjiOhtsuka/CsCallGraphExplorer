@@ -68,9 +68,12 @@ public static class CalleesQuery
                 as SyntaxNode;
 
             // Primary constructors (C# 12 records/classes) have no method or accessor
-            // declaration; fall back to the enclosing type declaration.
+            // declaration; fall back to the enclosing type declaration. Exclude
+            // implicitly-declared constructors (e.g. the record copy constructor),
+            // which share the primary constructor's location but are not in source.
             if (containingMember == null
-                && target is IMethodSymbol { MethodKind: MethodKind.Constructor })
+                && target is IMethodSymbol { MethodKind: MethodKind.Constructor }
+                && !target.IsImplicitlyDeclared)
             {
                 containingMember = tokenParent?
                     .AncestorsAndSelf().OfType<TypeDeclarationSyntax>().FirstOrDefault();
@@ -87,8 +90,9 @@ public static class CalleesQuery
                         .OfType<PrimaryConstructorBaseTypeSyntax>())
                     {
                         var info = semanticModel.GetSymbolInfo(primaryBase, ct);
-                        if (info.Symbol == null) continue;
-                        AddToMap(calleeMap, info.Symbol, primaryBase.GetLocation());
+                        var symbol = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
+                        if (symbol == null) continue;
+                        AddToMap(calleeMap, symbol, primaryBase.GetLocation());
                     }
                 }
                 continue;

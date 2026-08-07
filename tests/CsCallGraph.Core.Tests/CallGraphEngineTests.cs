@@ -317,6 +317,16 @@ public class CallGraphEngineTests
     }
 
     [Fact]
+    public async Task GetCallees_RecordCopyConstructor_ReturnsNoSpuriousCallees()
+    {
+        var result = await _engine.GetCalleesAsync(
+            _fixture.SolutionPath,
+            "SampleLibrary.DerivedRecord..ctor(DerivedRecord)");
+
+        Assert.Empty(result.Roots);
+    }
+
+    [Fact]
     public async Task GetCallers_BaseConstructor_ReturnsDerivedCtorInitializer()
     {
         var result = await _engine.GetCallersAsync(
