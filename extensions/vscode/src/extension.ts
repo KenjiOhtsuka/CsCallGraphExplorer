@@ -455,11 +455,15 @@ async function showInOutputPanel(
 
     channel.appendLine(`=== ${direction === 'callers' ? 'Callers' : 'Callees'} of ${data} ===`);
     channel.appendLine('');
+    const queryUri = items[0].uri;
     for (const call of calls ?? []) {
       const child = call.from ?? call.to;
       const ranges = call.fromRanges ?? [];
-      const file = child.uri
-        ? vscode.workspace.asRelativePath(vscode.Uri.parse(child.uri).fsPath, false)
+      // fromRanges are call sites inside the queried symbol for outgoing calls,
+      // and inside the caller for incoming calls.
+      const fileUri = ranges.length > 0 && direction === 'callees' ? queryUri : child.uri;
+      const file = fileUri
+        ? vscode.workspace.asRelativePath(vscode.Uri.parse(fileUri).fsPath, false)
         : '';
       const loc = ranges.length > 0
         ? `  at ${file ? `${file}:` : ''}${ranges[0].start.line + 1}:${ranges[0].start.character + 1}`
