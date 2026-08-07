@@ -69,6 +69,19 @@ public class CallHierarchyHandlerTests
     }
 
     [Fact]
+    public void PrepareCallHierarchy_PositionInsideMethodBody_ResolvesEnclosingMethod()
+    {
+        var response = _fixture.Handler.PrepareCallHierarchy(
+            PrepareRequest(_callersFile, line: 12, character: 5));
+
+        var items = Deserialize<CallHierarchyItem[]>(response);
+        var item = Assert.Single(items);
+
+        Assert.Equal("SampleConsoleApp.Callers.RunAll()", item.Data);
+        Assert.EndsWith("/SampleConsoleApp/Callers.cs", item.Uri);
+    }
+
+    [Fact]
     public void IncomingCalls_ItemsPointAtDeclarationsWithCallSiteRanges()
     {
         var response = _fixture.Handler.IncomingCalls(IncomingRequest(
