@@ -91,7 +91,7 @@ Each element in the sample must produce a predictable call graph that tests veri
 | `SampleLibrary.DerivedClass..ctor` | — | `: base()` → `BaseClass..ctor` | ✅ |
 | `SampleLibrary.DerivedRecord..ctor` | — | primary ctor chain → `BaseRecord..ctor` | ✅ |
 | `SampleLibrary.LambdasAndDelegates.LocalFunctionExample` | `CallDelegates` | `Multiply` (local function) | ✅ |
-| `SampleLibrary.DerivedClass.Greet` | `CallInheritance`, `Greet` (base call) | `Greet` (base) | ✅ |
+| `SampleLibrary.DerivedClass.Greet` | `CallInheritance` | `Greet` (base) | ✅ |
 | `SampleConsoleApp.Callers.RunAll` | entry point | all category methods | ✅ |
 
 ## Usage in Tests
