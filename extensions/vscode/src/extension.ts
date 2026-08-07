@@ -232,9 +232,10 @@ class LspCallHierarchyProvider implements vscode.CallHierarchyProvider {
     position: vscode.Position,
     token: vscode.CancellationToken
   ): Promise<vscode.CallHierarchyItem[]> {
+    const snapped = snapToWord(document, position);
     const params = {
       textDocument: { uri: document.uri.toString() },
-      position: { line: position.line, character: position.character },
+      position: { line: snapped.line, character: snapped.character },
     };
     const result: LspCallHierarchyItem[] = await this._client.request('textDocument/prepareCallHierarchy', params);
     if (!result || result.length === 0) return [];
@@ -354,6 +355,19 @@ function fromVscodeRange(r: vscode.Range): Range {
   };
 }
 
+function snapToWord(
+  document: vscode.TextDocument,
+  position: vscode.Position
+): vscode.Position {
+  const candidates = [position];
+  if (position.character > 0) candidates.push(position.translate(0, -1));
+  for (const pos of candidates) {
+    const word = document.getWordRangeAtPosition(pos);
+    if (word) return word.start;
+  }
+  return position;
+}
+
 async function resolveSolutionPath(): Promise<string | undefined> {
   const config = vscode.workspace.getConfiguration('csCallGraph');
   const configured = config.get<string>('solutionPath');
@@ -395,12 +409,16 @@ async function showInOutputPanel(
     return;
   }
 
-  const pos = editor.selection.active;
+  const rawPos = editor.selection.active;
+  const pos = snapToWord(editor.document, rawPos);
   const params = {
     textDocument: { uri: editor.document.uri.toString() },
     position: { line: pos.line, character: pos.character },
   };
-  channel.appendLine(`[Query] ${direction} at ${editor.document.fileName}:${pos.line + 1}:${pos.character + 1} (0-based ${pos.line}:${pos.character})`);
+  const snapped = pos.line !== rawPos.line || pos.character !== rawPos.character
+    ? ` (snapped from ${rawPos.line + 1}:${rawPos.character + 1})`
+    : '';
+  channel.appendLine(`[Query] ${direction} at ${editor.document.fileName}:${pos.line + 1}:${pos.character + 1} (0-based ${pos.line}:${pos.character})${snapped}`);
   const items: LspCallHierarchyItem[] = await client.request('textDocument/prepareCallHierarchy', params);
   if (!items || items.length === 0) {
     channel.appendLine('No symbol found at cursor.');
