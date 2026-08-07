@@ -35,9 +35,13 @@ class LspClient {
       });
       this._child.on('exit', (code) => {
         this._log(`[LSP] exited with code ${code}`);
+        this._child = undefined;
+        this._rejectPending(new Error(`LSP server exited with code ${code}`));
       });
       this._child.on('error', (err) => {
         this._log(`[LSP] spawn error: ${err.message}`);
+        this._child = undefined;
+        this._rejectPending(err);
         reject(err);
       });
 
@@ -60,9 +64,14 @@ class LspClient {
       this._child.kill();
     }
     this._child = undefined;
+    this._rejectPending(new Error('LSP server stopped'));
   }
 
   request(method: string, params: any): Promise<any> {
+    if (!this.isRunning) {
+      this._log(`[LSP !] ${method} rejected: LSP server is not running`);
+      return Promise.reject(new Error('LSP server is not running'));
+    }
     const id = this._msgId++;
     const t0 = Date.now();
     this._log(`[LSP ->] ${method} (id ${id})`);
@@ -84,6 +93,11 @@ class LspClient {
   notify(method: string, params?: any): void {
     this._log(`[LSP ->] ${method} (notify)`);
     this._send({ jsonrpc: '2.0', method, params });
+  }
+
+  private _rejectPending(err: Error): void {
+    for (const cb of this._pending.values()) cb.reject(err);
+    this._pending.clear();
   }
 
   private _send(msg: any): void {
@@ -411,6 +425,7 @@ async function showInOutputPanel(
     return;
   }
 
+  channel.clear();
   const rawPos = editor.selection.active;
   const pos = snapToWord(editor.document, rawPos);
   const params = {
@@ -421,32 +436,36 @@ async function showInOutputPanel(
     ? ` (snapped from ${rawPos.line + 1}:${rawPos.character + 1})`
     : '';
   channel.appendLine(`[Query] ${direction} at ${editor.document.fileName}:${pos.line + 1}:${pos.character + 1} (0-based ${pos.line}:${pos.character})${snapped}`);
-  const items: LspCallHierarchyItem[] = await client.request('textDocument/prepareCallHierarchy', params);
-  if (!items || items.length === 0) {
-    channel.appendLine('No symbol found at cursor.');
-    channel.appendLine(`[Hint] The cursor was at line ${pos.line + 1}, column ${pos.character + 1}. Click directly on the method name (not the parentheses/arguments) and re-run.`);
-    channel.show();
-    return;
-  }
 
-  const data = items[0].data ?? items[0].detail ?? items[0].name;
-  channel.appendLine(`[Resolved] ${data}`);
-  const method = direction === 'callers' ? 'callHierarchy/incomingCalls' : 'callHierarchy/outgoingCalls';
+  try {
+    const items: LspCallHierarchyItem[] = await client.request('textDocument/prepareCallHierarchy', params);
+    if (!items || items.length === 0) {
+      channel.appendLine('No symbol found at cursor.');
+      channel.appendLine(`[Hint] The cursor was at line ${pos.line + 1}, column ${pos.character + 1}. Click directly on the method name (not the parentheses/arguments) and re-run.`);
+      channel.show();
+      return;
+    }
 
-  const itemKey = { data: items[0].data };
-  const calls: any[] = await client.request(method, { item: itemKey });
+    const data = items[0].data ?? items[0].detail ?? items[0].name;
+    channel.appendLine(`[Resolved] ${data}`);
+    const method = direction === 'callers' ? 'callHierarchy/incomingCalls' : 'callHierarchy/outgoingCalls';
 
-  channel.clear();
-  channel.appendLine(`=== ${direction === 'callers' ? 'Callers' : 'Callees'} of ${data} ===`);
-  channel.appendLine('');
-  for (const call of calls ?? []) {
-    const child = call.from ?? call.to;
-    const ranges = call.fromRanges ?? [];
-    const loc = ranges.length > 0
-      ? `  at ${ranges[0].start.line + 1}:${ranges[0].start.character + 1}`
-      : '';
-    channel.appendLine(`  ${child.data ?? child.name}${loc}`);
+    const itemKey = { data: items[0].data };
+    const calls: any[] = await client.request(method, { item: itemKey });
+
+    channel.appendLine(`=== ${direction === 'callers' ? 'Callers' : 'Callees'} of ${data} ===`);
     channel.appendLine('');
+    for (const call of calls ?? []) {
+      const child = call.from ?? call.to;
+      const ranges = call.fromRanges ?? [];
+      const loc = ranges.length > 0
+        ? `  at ${ranges[0].start.line + 1}:${ranges[0].start.character + 1}`
+        : '';
+      channel.appendLine(`  ${child.data ?? child.name}${loc}`);
+      channel.appendLine('');
+    }
+  } catch (err: any) {
+    channel.appendLine(`[Error] ${err.message}`);
   }
   channel.show();
 }
