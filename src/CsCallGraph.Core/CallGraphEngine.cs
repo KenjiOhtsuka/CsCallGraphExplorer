@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
 using CsCallGraph.Core.Models;
 
@@ -208,7 +209,28 @@ public class CallGraphEngine : IDisposable
         if (info.Symbol is IMethodSymbol { MethodKind: MethodKind.AnonymousFunction })
             return info.Symbol;
 
-        return info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
+        return info.Symbol ?? info.CandidateSymbols.FirstOrDefault()
+            ?? ResolveEnclosingCallable(parent, semanticModel, ct);
+    }
+
+    private static ISymbol? ResolveEnclosingCallable(SyntaxNode node, SemanticModel semanticModel, CancellationToken ct)
+    {
+        for (SyntaxNode? current = node; current != null; current = current.Parent)
+        {
+            if (current is MethodDeclarationSyntax
+                or ConstructorDeclarationSyntax
+                or DestructorDeclarationSyntax
+                or OperatorDeclarationSyntax
+                or ConversionOperatorDeclarationSyntax
+                or LocalFunctionStatementSyntax
+                or AccessorDeclarationSyntax)
+            {
+                var symbol = semanticModel.GetDeclaredSymbol(current, ct);
+                if (symbol != null)
+                    return symbol;
+            }
+        }
+        return null;
     }
 
     private static Document? FindDocumentByPath(Solution solution, string filePath)
