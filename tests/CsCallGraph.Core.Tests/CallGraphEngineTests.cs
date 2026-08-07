@@ -292,11 +292,16 @@ public class CallGraphEngineTests
             _fixture.SolutionPath,
             "SampleLibrary.DerivedClass..ctor()");
 
-        Assert.Contains(result.Roots, r =>
-            r.Symbol.Name == ".ctor" &&
-            r.Symbol.ContainingType == "SampleLibrary.BaseClass" &&
-            r.Symbol.Parameters.Count == 1 &&
-            r.Symbol.Parameters[0].TypeName == "string");
+        Assert.Single(result.Roots);
+        var root = result.Roots[0];
+        Assert.Equal(".ctor", root.Symbol.Name);
+        Assert.Equal("SampleLibrary.BaseClass", root.Symbol.ContainingType);
+        Assert.Single(root.Symbol.Parameters);
+        Assert.Equal("string", root.Symbol.Parameters[0].TypeName);
+        var callSite = Assert.Single(root.CallSites);
+        Assert.EndsWith("Inheritance.cs", callSite.FilePath);
+        Assert.True(callSite.LineNumber >= 0);
+        Assert.True(callSite.Column >= 0);
     }
 
     [Fact]
