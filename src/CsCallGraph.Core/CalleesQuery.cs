@@ -60,12 +60,39 @@ public static class CalleesQuery
             var semanticModel = await document.GetSemanticModelAsync(ct);
             if (semanticModel == null) continue;
 
-            var containingMember = root.FindToken(loc.SourceSpan.Start).Parent?
+            var tokenParent = root.FindToken(loc.SourceSpan.Start).Parent;
+            var containingMember = tokenParent?
                 .AncestorsAndSelf().OfType<BaseMethodDeclarationSyntax>().FirstOrDefault()
-                ?? root.FindToken(loc.SourceSpan.Start).Parent?
+                ?? tokenParent?
                 .AncestorsAndSelf().OfType<AccessorDeclarationSyntax>().FirstOrDefault()
                 as SyntaxNode;
+
+            // Primary constructors (C# 12 records/classes) have no method or accessor
+            // declaration; fall back to the enclosing type declaration.
+            if (containingMember == null
+                && target is IMethodSymbol { MethodKind: MethodKind.Constructor })
+            {
+                containingMember = tokenParent?
+                    .AncestorsAndSelf().OfType<TypeDeclarationSyntax>().FirstOrDefault();
+            }
+
             if (containingMember == null) continue;
+
+            // Primary constructor scope: the base list is the only callee source.
+            if (containingMember is TypeDeclarationSyntax typeDecl)
+            {
+                if (typeDecl.BaseList is { } baseList)
+                {
+                    foreach (var primaryBase in baseList.Types
+                        .OfType<PrimaryConstructorBaseTypeSyntax>())
+                    {
+                        var info = semanticModel.GetSymbolInfo(primaryBase, ct);
+                        if (info.Symbol == null) continue;
+                        AddToMap(calleeMap, info.Symbol, primaryBase.GetLocation());
+                    }
+                }
+                continue;
+            }
 
             // Method calls
             foreach (var invocation in containingMember.DescendantNodes()
