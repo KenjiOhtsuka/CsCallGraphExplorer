@@ -145,7 +145,13 @@ public class CallHierarchyHandler : IDisposable
     {
         if (!Uri.TryCreate(uri, UriKind.Absolute, out var uriObj) || !uriObj.IsFile)
             return uri;
-        return uriObj.LocalPath;
+        // LocalPath on Windows mishandles the percent-encoded drive letter
+        // produced by VS Code (file:///c%3A/...) and returns a path with a
+        // leading slash, so derive the path from AbsolutePath instead.
+        var path = Uri.UnescapeDataString(uriObj.AbsolutePath);
+        if (path.Length >= 3 && path[2] == ':' && path[0] == '/')
+            path = path.Substring(1);
+        return path.Replace('/', Path.DirectorySeparatorChar);
     }
 
     private static string PathToUri(string path) =>

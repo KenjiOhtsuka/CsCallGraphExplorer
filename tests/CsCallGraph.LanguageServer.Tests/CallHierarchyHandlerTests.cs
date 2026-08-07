@@ -52,6 +52,23 @@ public class CallHierarchyHandlerTests
     }
 
     [Fact]
+    public void PrepareCallHierarchy_VsCodeEncodedDriveUri_ResolvesSymbol()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var encodedUri = _callersFile.Replace("://C:/", "://c%3A/");
+        var response = _fixture.Handler.PrepareCallHierarchy(
+            PrepareRequest(encodedUri, line: 99, character: 17));
+
+        var items = Deserialize<CallHierarchyItem[]>(response);
+        var item = Assert.Single(items);
+        Assert.Equal("SampleConsoleApp.Callers.CallStaticClass()", item.Data);
+    }
+
+    [Fact]
     public void IncomingCalls_ItemsPointAtDeclarationsWithCallSiteRanges()
     {
         var response = _fixture.Handler.IncomingCalls(IncomingRequest(
