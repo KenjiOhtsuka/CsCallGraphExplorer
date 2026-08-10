@@ -12,6 +12,8 @@ obj/
 ## Node / TypeScript (VS Code extension)
 extensions/vscode/node_modules/
 extensions/vscode/out/
+extensions/vscode/server/
+extensions/vscode/*.vsix
 
 ## OS
 .DS_Store

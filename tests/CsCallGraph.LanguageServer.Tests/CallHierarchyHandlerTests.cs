@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CsCallGraph.Core.Models;
 using Xunit;
 
 namespace CsCallGraph.LanguageServer.Tests;
@@ -138,6 +139,37 @@ public class CallHierarchyHandlerTests
         ContainsWithin(ctor.To.Range, ctor.To.SelectionRange);
     }
 
+    [Fact]
+    public void Callers_ReturnsFullTreeRootedAtTarget()
+    {
+        var response = _fixture.Handler.Callers(TreeRequest(
+            "SampleLibrary.PublicMethods.StaticMethod(string)", maxDepth: 10));
+
+        var result = Deserialize<CallGraphResult>(response);
+        Assert.Equal("StaticMethod", result.Target.DisplayString);
+        Assert.Equal("SampleLibrary.PublicMethods.StaticMethod(string)", result.Target.FullyQualifiedName);
+        Assert.Equal(CallDirection.Callers, result.Direction);
+        Assert.NotEmpty(result.Roots);
+
+        var root = result.Roots[0];
+        Assert.NotEmpty(root.Symbol.DisplayString);
+        Assert.NotEmpty(root.CallSites);
+        Assert.All(root.CallSites, s => Assert.True(s.LineNumber >= 0));
+    }
+
+    [Fact]
+    public void Callees_ReturnsFullTreeRootedAtTarget()
+    {
+        var response = _fixture.Handler.Callees(TreeRequest(
+            "SampleConsoleApp.Callers.RunAll", maxDepth: 10));
+
+        var result = Deserialize<CallGraphResult>(response);
+        Assert.Equal("RunAll", result.Target.DisplayString);
+        Assert.Equal("SampleConsoleApp.Callers.RunAll()", result.Target.FullyQualifiedName);
+        Assert.Equal(CallDirection.Callees, result.Direction);
+        Assert.NotEmpty(result.Roots);
+    }
+
     private static JsonRpcMessage PrepareRequest(string uri, int line, int character) =>
         new()
         {
@@ -162,11 +194,24 @@ public class CallHierarchyHandlerTests
                 $"{{\"item\":{{\"data\":\"{data}\"}}}}").RootElement,
         };
 
+    private static JsonRpcMessage TreeRequest(string symbol, int maxDepth) =>
+        new()
+        {
+            Id = (JsonRpcId)5,
+            Params = JsonDocument.Parse(
+                $"{{\"symbol\":\"{symbol}\",\"maxDepth\":{maxDepth}}}").RootElement,
+        };
+
+    private static readonly JsonSerializerOptions CaseInsensitive = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
+
     private static T Deserialize<T>(JsonRpcMessage? response)
     {
         Assert.NotNull(response);
         Assert.NotNull(response.Result);
-        return JsonSerializer.Deserialize<T>(response.Result!.Value.GetRawText())!;
+        return JsonSerializer.Deserialize<T>(response.Result!.Value.GetRawText(), CaseInsensitive)!;
     }
 
     private static void AssertRange(Range range, int startLine, int startChar, int endLine, int endChar)

@@ -2,21 +2,59 @@
   "name": "cs-call-graph",
   "displayName": "CsCallGraph",
   "description": "Call-hierarchy exploration for C# using Roslyn",
-  "version": "0.1.0",
-  "publisher": "cs-call-graph",
+  "version": "0.1.1",
+  "publisher": "KenjiOtsuka",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KenjiOhtsuka/CsCallGraphExplorer"
+  },
+  "bugs": {
+    "url": "https://github.com/KenjiOhtsuka/CsCallGraphExplorer/issues"
+  },
+  "homepage": "https://github.com/KenjiOhtsuka/CsCallGraphExplorer",
+  "keywords": [
+    "csharp",
+    "call-graph",
+    "call-hierarchy",
+    "callers",
+    "callees",
+    "roslyn"
+  ],
   "engines": {
     "vscode": "^1.96.0"
   },
   "categories": ["Other"],
   "activationEvents": [
     "onLanguage:csharp",
+    "onView:csCallGraph.callHierarchy",
     "onCommand:csCallGraph.showCallers",
     "onCommand:csCallGraph.showCallees",
+    "onCommand:csCallGraph.toggleDirection",
+    "onCommand:csCallGraph.copyCallTree",
+    "onCommand:csCallGraph.formatTree",
+    "onCommand:csCallGraph.formatJson",
     "onCommand:csCallGraph.listSymbols"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "csCallGraphSidebar",
+          "title": "CsCallGraph",
+          "icon": "$(graph-left)"
+        }
+      ]
+    },
+    "views": {
+      "csCallGraphSidebar": [
+        {
+          "id": "csCallGraph.callHierarchy",
+          "name": "Call Hierarchy"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "csCallGraph.showCallers",
@@ -25,6 +63,26 @@
       {
         "command": "csCallGraph.showCallees",
         "title": "CsCallGraph: Show Callees"
+      },
+      {
+        "command": "csCallGraph.toggleDirection",
+        "title": "Toggle Direction"
+      },
+      {
+        "command": "csCallGraph.copyCallTree",
+        "title": "Copy Call Tree"
+      },
+      {
+        "command": "csCallGraph.formatTree",
+        "title": "Format: Tree"
+      },
+      {
+        "command": "csCallGraph.formatJson",
+        "title": "Format: JSON"
+      },
+      {
+        "command": "csCallGraph.openLocation",
+        "title": "CsCallGraph: Open Location"
       },
       {
         "command": "csCallGraph.listSymbols",
@@ -46,6 +104,50 @@
         {
           "command": "csCallGraph.showCallees",
           "group": "csCallGraph@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "csCallGraph.toggleDirection",
+          "when": "view == csCallGraph.callHierarchy",
+          "group": "navigation"
+        },
+        {
+          "command": "csCallGraph.copyCallTree",
+          "when": "view == csCallGraph.callHierarchy",
+          "group": "navigation"
+        },
+        {
+          "command": "csCallGraph.formatTree",
+          "when": "view == csCallGraph.callHierarchy && csCallGraph.copyFormatIsTree",
+          "group": "navigation"
+        },
+        {
+          "command": "csCallGraph.formatJson",
+          "when": "view == csCallGraph.callHierarchy && !csCallGraph.copyFormatIsTree",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "csCallGraph.toggleDirection",
+          "when": "view == csCallGraph.callHierarchy"
+        },
+        {
+          "command": "csCallGraph.copyCallTree",
+          "when": "view == csCallGraph.callHierarchy"
+        },
+        {
+          "command": "csCallGraph.formatTree",
+          "when": "view == csCallGraph.callHierarchy && csCallGraph.copyFormatIsTree"
+        },
+        {
+          "command": "csCallGraph.formatJson",
+          "when": "view == csCallGraph.callHierarchy && !csCallGraph.copyFormatIsTree"
+        },
+        {
+          "command": "csCallGraph.openLocation",
+          "when": "false"
         }
       ]
     },
@@ -86,11 +188,15 @@
     "vscode:prepublish": "tsc -p ./",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "package:server": "dotnet publish ../../src/CsCallGraph.LanguageServer/CsCallGraph.LanguageServer.csproj -c Release -o server",
+    "package": "npm run package:server && npm run compile && vsce package",
+    "publish:beta": "npm run package:server && npm run compile && vsce publish --pre-release"
   },
   "devDependencies": {
     "@types/vscode": "^1.96.0",
     "@types/node": "^22.0.0",
+    "@vscode/vsce": "^3.9.2",
     "typescript": "^5.7.0"
   }
 }

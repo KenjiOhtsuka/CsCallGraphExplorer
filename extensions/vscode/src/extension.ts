@@ -152,22 +152,76 @@ interface Range {
   end: { line: number; character: number };
 }
 
-interface LspIncomingCall {
-  from: LspCallHierarchyItem;
-  fromRanges: Range[];
+// ---------------------------------------------------------------------------
+// Types for LSP call-graph tree methods (csCallGraph/callers, csCallGraph/callees)
+// ---------------------------------------------------------------------------
+interface LspCallSite {
+  filePath: string;
+  lineNumber: number;
+  column: number;
+  endLineNumber: number;
+  endColumn: number;
 }
 
-interface LspOutgoingCall {
-  to: LspCallHierarchyItem;
-  fromRanges: Range[];
+interface LspParameterInfo {
+  name: string;
+  typeName: string;
+  isRef: boolean;
+  isOut: boolean;
 }
+
+interface LspSymbolDescriptor {
+  name: string;
+  fullyQualifiedName: string;
+  containingType: string;
+  containingNamespace: string;
+  kind: number;
+  isStatic: boolean;
+  arity: number;
+  parameters: LspParameterInfo[];
+  declarationLocations: LspCallSite[];
+  identifierLocations: LspCallSite[];
+  displayString: string;
+}
+
+interface LspCallGraphNode {
+  symbol: LspSymbolDescriptor;
+  callSites: LspCallSite[];
+  callCount: number;
+  children: LspCallGraphNode[];
+}
+
+interface LspCallGraphResult {
+  target: LspSymbolDescriptor;
+  direction: number; // 0 = Callers, 1 = Callees
+  roots: LspCallGraphNode[];
+}
+
+type TreeDirection = 'callers' | 'callees';
 
 // ---------------------------------------------------------------------------
 // Extension entry point
 // ---------------------------------------------------------------------------
 let lspClient: LspClient | undefined;
+let copyFormatIsTree = true;
+
+async function setCopyFormat(isTree: boolean): Promise<void> {
+  copyFormatIsTree = isTree;
+  await vscode.commands.executeCommand('setContext', 'csCallGraph.copyFormatIsTree', isTree);
+}
+
+async function copyToClipboard(provider: CallGraphTreeProvider): Promise<void> {
+  try {
+    await vscode.env.clipboard.writeText(provider.copyTree());
+    const fmt = copyFormatIsTree ? 'tree' : 'JSON';
+    vscode.window.showInformationMessage(`CsCallGraph: call tree copied to clipboard (${fmt})`);
+  } catch (err: any) {
+    vscode.window.showErrorMessage(`CsCallGraph: ${err.message}`);
+  }
+}
 
 export async function activate(context: vscode.ExtensionContext) {
+  await vscode.commands.executeCommand('setContext', 'csCallGraph.copyFormatIsTree', copyFormatIsTree);
   const outputChannel = vscode.window.createOutputChannel('CsCallGraph');
   context.subscriptions.push(outputChannel);
 
@@ -190,20 +244,24 @@ export async function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine(`[CsCallGraph] Solution: ${slnPath}`);
 
   const projectRoot = path.resolve(__dirname, '..', '..', '..');
-  const lspProject = path.join(projectRoot, 'src', 'CsCallGraph.LanguageServer');
+  const repoLspProject = path.join(projectRoot, 'src', 'CsCallGraph.LanguageServer');
 
-  const lspDll = path.join(lspProject, 'bin', 'Debug', 'net10.0', 'CsCallGraph.LanguageServer.dll');
-  const isPublished = fs.existsSync(lspDll);
+  const resolveLspCommand = (): { command: string; args: string[] } => {
+    const repoDll = path.join(repoLspProject, 'bin', 'Debug', 'net10.0', 'CsCallGraph.LanguageServer.dll');
+    if (fs.existsSync(repoDll)) {
+      log(`[LSP] using repo Debug build: ${repoDll}`);
+      return { command: 'dotnet', args: [repoDll, '--solution', slnPath] };
+    }
+    const bundledDll = path.join(__dirname, '..', 'server', 'CsCallGraph.LanguageServer.dll');
+    if (fs.existsSync(bundledDll)) {
+      log(`[LSP] using bundled server: ${bundledDll}`);
+      return { command: 'dotnet', args: [bundledDll, '--solution', slnPath] };
+    }
+    log(`[LSP] no published server found; falling back to 'dotnet run --project'`);
+    return { command: 'dotnet', args: ['run', '--project', repoLspProject, '--', '--solution', slnPath] };
+  };
 
-  let command: string;
-  let args: string[];
-  if (isPublished) {
-    command = 'dotnet';
-    args = [lspDll, '--solution', slnPath];
-  } else {
-    command = 'dotnet';
-    args = ['run', '--project', lspProject, '--', '--solution', slnPath];
-  }
+  const { command, args } = resolveLspCommand();
 
   lspClient = new LspClient(log);
   try {
@@ -216,16 +274,39 @@ export async function activate(context: vscode.ExtensionContext) {
     return;
   }
 
-  context.subscriptions.push(
-    vscode.languages.registerCallHierarchyProvider('csharp', new LspCallHierarchyProvider(lspClient))
-  );
+  const provider = new CallGraphTreeProvider(lspClient);
+  const treeView = vscode.window.createTreeView('csCallGraph.callHierarchy', {
+    treeDataProvider: provider,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(treeView);
+  provider.onDidChangeTreeData(() => {
+    treeView.description = provider.label || undefined;
+  });
 
   context.subscriptions.push(
     vscode.commands.registerCommand('csCallGraph.showCallers', () =>
-      showInOutputPanel(outputChannel, lspClient!, 'callers')
+      showInSidebar(treeView, provider, lspClient!, 'callers')
     ),
     vscode.commands.registerCommand('csCallGraph.showCallees', () =>
-      showInOutputPanel(outputChannel, lspClient!, 'callees')
+      showInSidebar(treeView, provider, lspClient!, 'callees')
+    ),
+    vscode.commands.registerCommand('csCallGraph.toggleDirection', async () => {
+      try {
+        await provider.toggleDirection();
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`CsCallGraph: ${err.message}`);
+      }
+    }),
+    vscode.commands.registerCommand('csCallGraph.copyCallTree', () => copyToClipboard(provider)),
+    vscode.commands.registerCommand('csCallGraph.formatTree', async () => {
+      await setCopyFormat(false);
+    }),
+    vscode.commands.registerCommand('csCallGraph.formatJson', async () => {
+      await setCopyFormat(true);
+    }),
+    vscode.commands.registerCommand('csCallGraph.openLocation', (site: LspCallSite) =>
+      openLocation(site)
     ),
     vscode.commands.registerCommand('csCallGraph.listSymbols', () =>
       listSymbolsInOutputPanel(outputChannel)
@@ -236,141 +317,8 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 // ---------------------------------------------------------------------------
-// CallHierarchyProvider — uses LSP server
-// ---------------------------------------------------------------------------
-const _itemData = new WeakMap<vscode.CallHierarchyItem, string>();
-
-class LspCallHierarchyProvider implements vscode.CallHierarchyProvider {
-  constructor(private _client: LspClient) {}
-
-  async prepareCallHierarchy(
-    document: vscode.TextDocument,
-    position: vscode.Position,
-    token: vscode.CancellationToken
-  ): Promise<vscode.CallHierarchyItem[]> {
-    const snapped = snapToWord(document, position);
-    const params = {
-      textDocument: { uri: document.uri.toString() },
-      position: { line: snapped.line, character: snapped.character },
-    };
-    const result: LspCallHierarchyItem[] = await this._client.request('textDocument/prepareCallHierarchy', params);
-    if (!result || result.length === 0) return [];
-
-    return result.map((r) => {
-      const item = new vscode.CallHierarchyItem(
-        toVscodeSymbolKind(r.kind),
-        r.name,
-        r.detail ?? '',
-        vscode.Uri.parse(r.uri),
-        toVscodeRange(r.range),
-        toVscodeRange(r.selectionRange)
-      );
-      if (r.data) {
-        _itemData.set(item, r.data);
-      }
-      return item;
-    });
-  }
-
-  async provideCallHierarchyIncomingCalls(
-    item: vscode.CallHierarchyItem,
-    token: vscode.CancellationToken
-  ): Promise<vscode.CallHierarchyIncomingCall[]> {
-    const params = { item: toLspItem(item) };
-    const result: LspIncomingCall[] = await this._client.request('callHierarchy/incomingCalls', params);
-    return (result ?? []).map((r) => new vscode.CallHierarchyIncomingCall(
-      fromLspItem(r.from),
-      (r.fromRanges ?? []).map((rr) => toVscodeRange(rr))
-    ));
-  }
-
-  async provideCallHierarchyOutgoingCalls(
-    item: vscode.CallHierarchyItem,
-    token: vscode.CancellationToken
-  ): Promise<vscode.CallHierarchyOutgoingCall[]> {
-    const params = { item: toLspItem(item) };
-    const result: LspOutgoingCall[] = await this._client.request('callHierarchy/outgoingCalls', params);
-    return (result ?? []).map((r) => new vscode.CallHierarchyOutgoingCall(
-      fromLspItem(r.to),
-      (r.fromRanges ?? []).map((rr) => toVscodeRange(rr))
-    ));
-  }
-}
-
-function toLspItem(item: vscode.CallHierarchyItem): LspCallHierarchyItem {
-  return {
-    name: item.name,
-    kind: item.kind,
-    detail: item.detail,
-    uri: item.uri.toString(),
-    range: fromVscodeRange(item.range),
-    selectionRange: fromVscodeRange(item.selectionRange),
-    data: _itemData.get(item),
-  };
-}
-
-function fromLspItem(r: LspCallHierarchyItem): vscode.CallHierarchyItem {
-  const item = new vscode.CallHierarchyItem(
-    toVscodeSymbolKind(r.kind),
-    r.name,
-    r.detail ?? '',
-    vscode.Uri.parse(r.uri),
-    toVscodeRange(r.range),
-    toVscodeRange(r.selectionRange)
-  );
-  if (r.data) {
-    _itemData.set(item, r.data);
-  }
-  return item;
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function toVscodeSymbolKind(lspKind: number): vscode.SymbolKind {
-  const map: Record<number, vscode.SymbolKind> = {
-    1: vscode.SymbolKind.File,
-    2: vscode.SymbolKind.Module,
-    3: vscode.SymbolKind.Namespace,
-    4: vscode.SymbolKind.Package,
-    5: vscode.SymbolKind.Class,
-    6: vscode.SymbolKind.Method,
-    7: vscode.SymbolKind.Property,
-    8: vscode.SymbolKind.Field,
-    9: vscode.SymbolKind.Constructor,
-    10: vscode.SymbolKind.Enum,
-    11: vscode.SymbolKind.Interface,
-    12: vscode.SymbolKind.Function,
-    13: vscode.SymbolKind.Variable,
-    14: vscode.SymbolKind.Constant,
-    15: vscode.SymbolKind.String,
-    16: vscode.SymbolKind.Number,
-    17: vscode.SymbolKind.Boolean,
-    18: vscode.SymbolKind.Array,
-    19: vscode.SymbolKind.Object,
-    20: vscode.SymbolKind.Key,
-    21: vscode.SymbolKind.Null,
-    22: vscode.SymbolKind.EnumMember,
-    23: vscode.SymbolKind.Struct,
-    24: vscode.SymbolKind.Event,
-    25: vscode.SymbolKind.Operator,
-    26: vscode.SymbolKind.TypeParameter,
-  };
-  return map[lspKind] ?? vscode.SymbolKind.Method;
-}
-
-function toVscodeRange(r: Range): vscode.Range {
-  if (!r) return new vscode.Range(0, 0, 0, 0);
-  return new vscode.Range(r.start.line, r.start.character, r.end.line, r.end.character);
-}
-
-function fromVscodeRange(r: vscode.Range): Range {
-  return {
-    start: { line: r.start.line, character: r.start.character },
-    end: { line: r.end.line, character: r.end.character },
-  };
-}
-
 function snapToWord(
   document: vscode.TextDocument,
   position: vscode.Position
@@ -414,69 +362,247 @@ async function resolveSolutionPath(): Promise<string | undefined> {
   return undefined;
 }
 
-async function showInOutputPanel(
-  channel: vscode.OutputChannel,
+async function showInSidebar(
+  treeView: vscode.TreeView<CallTreeNode>,
+  provider: CallGraphTreeProvider,
   client: LspClient,
-  direction: 'callers' | 'callees'
+  direction: TreeDirection
 ): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor || editor.document.languageId !== 'csharp') {
-    vscode.window.showErrorMessage('Open a C# file first');
+    vscode.window.showErrorMessage('CsCallGraph: open a C# file first');
     return;
   }
 
-  channel.clear();
   const rawPos = editor.selection.active;
   const pos = snapToWord(editor.document, rawPos);
   const params = {
     textDocument: { uri: editor.document.uri.toString() },
     position: { line: pos.line, character: pos.character },
   };
-  const snapped = pos.line !== rawPos.line || pos.character !== rawPos.character
-    ? ` (snapped from ${rawPos.line + 1}:${rawPos.character + 1})`
-    : '';
-  channel.appendLine(`[Query] ${direction} at ${editor.document.fileName}:${pos.line + 1}:${pos.character + 1} (0-based ${pos.line}:${pos.character})${snapped}`);
 
   try {
     const items: LspCallHierarchyItem[] = await client.request('textDocument/prepareCallHierarchy', params);
     if (!items || items.length === 0) {
-      channel.appendLine('No symbol found at cursor.');
-      channel.appendLine(`[Hint] The cursor was at line ${pos.line + 1}, column ${pos.character + 1}. Click directly on the method name (not the parentheses/arguments) and re-run.`);
-      channel.show();
+      vscode.window.showErrorMessage(
+        'CsCallGraph: no symbol found at cursor. Click directly on the method name and re-run.');
       return;
     }
 
-    const data = items[0].data ?? items[0].detail ?? items[0].name;
-    channel.appendLine(`[Resolved] ${data}`);
-    const method = direction === 'callers' ? 'callHierarchy/incomingCalls' : 'callHierarchy/outgoingCalls';
-
-    const itemKey = { data: items[0].data };
-    const calls: any[] = await client.request(method, { item: itemKey });
-
-    channel.appendLine(`=== ${direction === 'callers' ? 'Callers' : 'Callees'} of ${data} ===`);
-    channel.appendLine('');
-    const queryUri = items[0].uri;
-    for (const call of calls ?? []) {
-      const child = call.from ?? call.to;
-      const ranges = call.fromRanges ?? [];
-      // fromRanges are call sites inside the queried symbol for outgoing calls,
-      // and inside the caller for incoming calls.
-      const fileUri = ranges.length > 0 && direction === 'callees' ? queryUri : child.uri;
-      const file = fileUri
-        ? vscode.workspace.asRelativePath(vscode.Uri.parse(fileUri).fsPath, false)
-        : '';
-      const loc = ranges.length > 0
-        ? `  at ${file ? `${file}:` : ''}${ranges[0].start.line + 1}:${ranges[0].start.character + 1}`
-        : file
-          ? `  at ${file}`
-          : '';
-      channel.appendLine(`  ${child.data ?? child.name}${loc}`);
-      channel.appendLine('');
-    }
+    const symbol = items[0].data ?? items[0].detail ?? items[0].name;
+    const maxDepth = vscode.workspace.getConfiguration('csCallGraph').get<number>('maxDepth', 10);
+    await provider.show(symbol, direction, maxDepth);
+    await vscode.commands.executeCommand('csCallGraph.callHierarchy.focus');
+    await provider.revealFirst(treeView);
   } catch (err: any) {
-    channel.appendLine(`[Error] ${err.message}`);
+    vscode.window.showErrorMessage(`CsCallGraph: ${err.message}`);
   }
-  channel.show();
+}
+
+async function openLocation(site: LspCallSite): Promise<void> {
+  if (!site?.filePath) return;
+  const doc = await vscode.workspace.openTextDocument(site.filePath);
+  const editor = await vscode.window.showTextDocument(doc);
+  const sel = new vscode.Range(site.lineNumber, site.column, site.endLineNumber, site.endColumn);
+  editor.selection = new vscode.Selection(sel.start, sel.end);
+  editor.revealRange(sel, vscode.TextEditorRevealType.InCenter);
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar tree — renders the full call-graph tree returned by the server
+// ---------------------------------------------------------------------------
+const KIND_ICONS: Record<number, string> = {
+  0: 'M', // Method
+  1: 'C', // Constructor
+  2: 'P', // Property
+  3: 'F', // Field
+  4: 'E', // Event
+  5: 'I', // Indexer
+  6: 'O', // Operator
+  7: 'λ', // Lambda
+  8: 'L', // LocalFunction
+};
+
+function kindIcon(kind: number): string {
+  return KIND_ICONS[kind] ?? '?';
+}
+
+function relativeFilePath(filePath: string): string {
+  if (!filePath) return '';
+  if (!path.isAbsolute(filePath)) return filePath;
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (root) {
+    const rel = path.relative(root, filePath);
+    if (!rel.startsWith('..') && !path.isAbsolute(rel)) return rel.split(path.sep).join('/');
+  }
+  return filePath.split(path.sep).join('/');
+}
+
+class CallTreeNode extends vscode.TreeItem {
+  constructor(
+    public readonly node: LspCallGraphNode,
+    public readonly parent: CallTreeNode | undefined
+  ) {
+    const sym = node.symbol;
+    super(
+      sym.displayString || sym.name,
+      (node.children?.length ?? 0) > 0
+        ? vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.None
+    );
+
+    const first = sym.declarationLocations?.[0] ?? sym.identifierLocations?.[0];
+    const parts: string[] = [];
+    if (sym.isStatic) parts.push('(static)');
+    const file = first ? relativeFilePath(first.filePath) : '';
+    if (file) parts.push(file);
+    if (parts.length > 0) this.description = parts.join(' ');
+
+    const site = node.callSites?.[0];
+    const tooltip = new vscode.MarkdownString();
+    tooltip.appendCodeblock(sym.fullyQualifiedName || sym.displayString, 'csharp');
+    if (node.callCount > 0) tooltip.appendMarkdown(`**${node.callCount}** call site(s)`);
+    if (site) {
+      tooltip.appendMarkdown(
+        `\n\nFirst call site: \`${relativeFilePath(site.filePath)}:${site.lineNumber + 1},${site.column + 1}\``);
+    }
+    this.tooltip = tooltip;
+
+    if (first) {
+      this.command = {
+        command: 'csCallGraph.openLocation',
+        title: 'Open',
+        arguments: [first],
+      };
+    }
+  }
+
+  static placeholder(label: string, description: string): CallTreeNode {
+    const node = new CallTreeNode({
+      symbol: {
+        name: label,
+        fullyQualifiedName: label,
+        containingType: '',
+        containingNamespace: '',
+        kind: 0,
+        isStatic: false,
+        arity: 0,
+        parameters: [],
+        declarationLocations: [],
+        identifierLocations: [],
+        displayString: label,
+      },
+      callSites: [],
+      callCount: 0,
+      children: [],
+    }, undefined);
+    node.description = description;
+    node.contextValue = 'csCallGraph.placeholder';
+    return node;
+  }
+}
+
+class CallGraphTreeProvider implements vscode.TreeDataProvider<CallTreeNode> {
+  private readonly _onDidChangeTreeData = new vscode.EventEmitter<CallTreeNode | undefined>();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  private _client: LspClient;
+  private _result: LspCallGraphResult | undefined;
+  private _symbol = '';
+  private _direction: TreeDirection = 'callers';
+  private _maxDepth = 10;
+  private _roots: CallTreeNode[] = [];
+
+  constructor(client: LspClient) {
+    this._client = client;
+  }
+
+  get label(): string {
+    if (!this._result) return '';
+    const dir = this._direction === 'callers' ? 'Callers' : 'Callees';
+    return `${dir} of ${this._result.target.displayString || this._result.target.name}`;
+  }
+
+  async show(symbol: string, direction: TreeDirection, maxDepth: number): Promise<void> {
+    this._symbol = symbol;
+    this._direction = direction;
+    this._maxDepth = maxDepth;
+    const method = direction === 'callers' ? 'csCallGraph/callers' : 'csCallGraph/callees';
+    const result = (await this._client.request(method, { symbol, maxDepth })) as LspCallGraphResult;
+    this._result = result;
+    this._roots = (result.roots ?? []).map((n) => new CallTreeNode(n, undefined));
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  async toggleDirection(): Promise<void> {
+    if (!this._result) throw new Error('run Show Callers or Show Callees first');
+    await this.show(this._symbol, this._direction === 'callers' ? 'callees' : 'callers', this._maxDepth);
+  }
+
+  getTreeItem(element: CallTreeNode): vscode.TreeItem {
+    return element;
+  }
+
+  getChildren(element?: CallTreeNode): CallTreeNode[] {
+    if (!element) {
+      if (!this._result) return [];
+      if (this._roots.length === 0) {
+        const label = this._direction === 'callers' ? 'No callers' : 'No callees';
+        return [CallTreeNode.placeholder(label, 'Nothing found in the solution')];
+      }
+      return this._roots;
+    }
+    return (element.node.children ?? []).map((c) => new CallTreeNode(c, element));
+  }
+
+  getParent(element: CallTreeNode): CallTreeNode | undefined {
+    return element.parent;
+  }
+
+  async revealFirst(treeView: vscode.TreeView<CallTreeNode>): Promise<void> {
+    const root = this._roots[0];
+    if (!root) return;
+    try {
+      await treeView.reveal(root, { expand: true, focus: false });
+    } catch {
+      // tree view may not be visible yet; ignore
+    }
+  }
+
+  copyTree(): string {
+    const result = this._result;
+    if (!result) throw new Error('run Show Callers or Show Callees first');
+    if (!copyFormatIsTree) {
+      return JSON.stringify(result, null, 2);
+    }
+
+    const lines: string[] = [];
+    const dir = this._direction === 'callers' ? 'Callers' : 'Callees';
+    lines.push(`${dir} of ${result.target.displayString || result.target.name}`);
+    if (result.roots.length === 0) {
+      lines.push('  (none)');
+    } else {
+      result.roots.forEach((node, i) => this._formatNode(lines, node, '', i === result.roots.length - 1));
+    }
+    return lines.join('\n');
+  }
+
+  private _formatNode(lines: string[], node: LspCallGraphNode, indent: string, isLast: boolean): void {
+    const prefix = isLast ? '└─ ' : '├─ ';
+    const staticTag = node.symbol.isStatic ? ' (static)' : '';
+    const targetInfo = node.callCount > 0 ? `  —  ${node.callCount} call site(s)` : '';
+    const sites = (node.callSites ?? [])
+      .map((s) => `at ${relativeFilePath(s.filePath)}:${s.lineNumber + 1},${s.column + 1}`)
+      .join('; ');
+    const sitesPart = sites ? `  ${sites}` : '';
+
+    lines.push(
+      `${indent}${prefix}[${kindIcon(node.symbol.kind)}] ${node.symbol.displayString || node.symbol.name}${staticTag}${targetInfo}${sitesPart}`
+    );
+
+    const childIndent = indent + (isLast ? '   ' : '│  ');
+    (node.children ?? []).forEach((c, i) => this._formatNode(lines, c, childIndent, i === node.children.length - 1));
+  }
 }
 
 async function listSymbolsInOutputPanel(channel: vscode.OutputChannel): Promise<void> {
@@ -494,6 +620,21 @@ function registerFallbackCommands(
     }),
     vscode.commands.registerCommand('csCallGraph.showCallees', () => {
       channel.show();
+    }),
+    vscode.commands.registerCommand('csCallGraph.toggleDirection', () => {
+      vscode.window.showErrorMessage('CsCallGraph: LSP server is not running');
+    }),
+    vscode.commands.registerCommand('csCallGraph.copyCallTree', () => {
+      vscode.window.showErrorMessage('CsCallGraph: LSP server is not running');
+    }),
+    vscode.commands.registerCommand('csCallGraph.formatTree', () => {
+      vscode.window.showErrorMessage('CsCallGraph: LSP server is not running');
+    }),
+    vscode.commands.registerCommand('csCallGraph.formatJson', () => {
+      vscode.window.showErrorMessage('CsCallGraph: LSP server is not running');
+    }),
+    vscode.commands.registerCommand('csCallGraph.openLocation', () => {
+      vscode.window.showErrorMessage('CsCallGraph: LSP server is not running');
     }),
     vscode.commands.registerCommand('csCallGraph.listSymbols', () => {
       channel.show();
