@@ -109,6 +109,8 @@ public partial class LspServer : IDisposable
                 "textDocument/prepareCallHierarchy" => _handler.PrepareCallHierarchy(msg),
                 "callHierarchy/incomingCalls" => _handler.IncomingCalls(msg),
                 "callHierarchy/outgoingCalls" => _handler.OutgoingCalls(msg),
+                "csCallGraph/callers" => _handler.Callers(msg),
+                "csCallGraph/callees" => _handler.Callees(msg),
                 _ => null,
             };
         }

@@ -74,6 +74,36 @@ public class CallHierarchyHandler : IDisposable
         };
     }
 
+    public JsonRpcMessage? Callers(JsonRpcMessage msg) => CallTree(msg, CallDirection.Callers);
+
+    public JsonRpcMessage? Callees(JsonRpcMessage msg) => CallTree(msg, CallDirection.Callees);
+
+    private JsonRpcMessage? CallTree(JsonRpcMessage msg, CallDirection direction)
+    {
+        if (msg.Params == null) return Error(msg.Id, -32602, "Missing params");
+        if (!msg.Params.Value.TryGetProperty("symbol", out var symbolProp)
+            || symbolProp.ValueKind != JsonValueKind.String)
+            return Error(msg.Id, -32602, "Missing symbol");
+        var symbol = symbolProp.GetString();
+        if (symbol == null) return Error(msg.Id, -32602, "Missing symbol");
+
+        var maxDepth = 0;
+        if (msg.Params.Value.TryGetProperty("maxDepth", out var depthProp)
+            && (depthProp.ValueKind != JsonValueKind.Number
+                || !depthProp.TryGetInt32(out maxDepth)))
+            return Error(msg.Id, -32602, "Invalid maxDepth");
+
+        var result = direction == CallDirection.Callers
+            ? _engine.GetCallersAsync(_solutionPath, symbol, maxDepth).GetAwaiter().GetResult()
+            : _engine.GetCalleesAsync(_solutionPath, symbol, maxDepth).GetAwaiter().GetResult();
+
+        return new JsonRpcMessage
+        {
+            Id = msg.Id,
+            Result = JsonSerializer.SerializeToElement(result, JsonOpts),
+        };
+    }
+
     private static CallHierarchyItem? ToLspItem(SymbolDescriptor? desc)
     {
         if (desc == null) return null;

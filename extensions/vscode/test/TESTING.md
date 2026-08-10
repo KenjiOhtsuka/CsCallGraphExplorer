@@ -89,6 +89,20 @@ Send-Lsp '{"jsonrpc":"2.0","id":3,"method":"callHierarchy/incomingCalls","params
 Send-Lsp '{"jsonrpc":"2.0","id":4,"method":"callHierarchy/outgoingCalls","params":{"item":{"name":"RunAll","kind":6,"uri":"file:///C:/Users/user/project/CsCallGraphExplorer/samples/SampleConsoleApp/Callers.cs","range":{"start":{"line":11,"character":4},"end":{"line":28,"character":5}},"selectionRange":{"start":{"line":11,"character":16},"end":{"line":11,"character":22}},"data":"SampleConsoleApp.Callers.RunAll()"}}}'
 ```
 
+### Send csCallGraph/callees (full tree)
+
+```powershell
+Send-Lsp '{"jsonrpc":"2.0","id":6,"method":"csCallGraph/callees","params":{"symbol":"SampleConsoleApp.Callers.RunAll","maxDepth":10}}'
+```
+
+### Send csCallGraph/callers (full tree)
+
+```powershell
+Send-Lsp '{"jsonrpc":"2.0","id":7,"method":"csCallGraph/callers","params":{"symbol":"SampleLibrary.PublicMethods.StaticMethod(string)"}}'
+```
+
+`symbol` is the fully qualified name — the `data` field of a `prepareCallHierarchy` item (e.g. `SampleConsoleApp.Callers.RunAll()` or `SampleLibrary.PublicMethods.StaticMethod(string)`). The trailing `()` is optional: `SampleConsoleApp.Callers.RunAll` and `SampleConsoleApp.Callers.RunAll()` are equivalent. `maxDepth` is optional (0 = unlimited). The response is the full `CallGraphResult`: `target`, `direction` (0 = callers, 1 = callees), and nested `roots` with `symbol`, `callSites`, `callCount`, `children`.
+
 ### Shutdown
 
 ```powershell
@@ -127,13 +141,29 @@ In the Extension Development Host:
 
 1. Place cursor on a method call (e.g., line 38 `PublicMethods.StaticMethod("world")`)
 2. **Ctrl+Shift+P** → `CsCallGraph: Show Callers`
-3. Check the **CsCallGraph** output panel (View > Output > CsCallGraph)
+3. The **CsCallGraph** activity-bar icon (graph icon) appears; the **Call Hierarchy** tree in the sidebar is populated and focused. Nodes are expandable; the view title shows `Callers of <name>`.
+4. Click a node to jump to its declaration/call site in the editor.
+
+### Test the sidebar buttons
+
+1. With a tree loaded in the **Call Hierarchy** sidebar view, the title bar shows:
+   - **Toggle Direction** — switches between callers and callees of the same symbol.
+   - **Copy Call Tree** — copies the tree in the current format.
+   - **Format: Tree** / **Format: JSON** — indicates the current copy format; click to switch it.
+2. Toggle direction — the tree re-queries and the view title flips to `Callees of <name>`. If the other direction has no results (e.g. an interface method with no body), a `No callees` / `No callers` placeholder node is shown instead of an empty view.
+3. Copy in **tree** format — paste somewhere; expect one line per node with inline call sites:
+   ```
+   Callers of Process
+   └─ [M] CallInheritance  —  1 call site(s)  at Callers.cs:54,23
+      └─ [M] RunAll  —  1 call site(s)  at Callers.cs:17,9
+   ```
+4. Click **Format: JSON**, then **Copy Call Tree** — the clipboard gets the pretty-printed `CallGraphResult` JSON.
 
 ### Test with the context menu
 
 1. Right-click on a symbol in a C# file
 2. Go to **CsCallGraph > Show Callers** (or Show Callees)
-3. Results appear in the output panel
+3. The tree appears in the **Call Hierarchy** sidebar view
 
 ### Debug the extension
 
@@ -148,8 +178,8 @@ When the extension is updated to use LSP instead of shell-out:
 
 1. The LSP server starts automatically when VS Code opens a C# file
 2. No manual solution path configuration needed (auto-detected)
-3. Use VS Code's built-in **Peek > Call Hierarchy** (Ctrl+Shift+H) or right-click
-4. Results appear in the native call hierarchy tree view
+3. Use **CsCallGraph: Show Callers** / **Show Callees** (command palette or context menu)
+4. Results appear in the **Call Hierarchy** sidebar tree (the built-in Peek > Call Hierarchy is no longer wired up)
 
 ## Troubleshooting
 
