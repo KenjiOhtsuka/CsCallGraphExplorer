@@ -300,10 +300,10 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand('csCallGraph.copyCallTree', () => copyToClipboard(provider)),
     vscode.commands.registerCommand('csCallGraph.formatTree', async () => {
-      await setCopyFormat(false);
+      await setCopyFormat(true);
     }),
     vscode.commands.registerCommand('csCallGraph.formatJson', async () => {
-      await setCopyFormat(true);
+      await setCopyFormat(false);
     }),
     vscode.commands.registerCommand('csCallGraph.openLocation', (site: LspCallSite) =>
       openLocation(site)
@@ -468,11 +468,12 @@ class CallTreeNode extends vscode.TreeItem {
     }
     this.tooltip = tooltip;
 
-    if (first) {
+    const location = site ?? first;
+    if (location) {
       this.command = {
         command: 'csCallGraph.openLocation',
         title: 'Open',
-        arguments: [first],
+        arguments: [location],
       };
     }
   }

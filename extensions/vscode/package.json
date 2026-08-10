@@ -43,7 +43,7 @@
         {
           "id": "csCallGraphSidebar",
           "title": "CsCallGraph",
-          "icon": "$(graph-left)"
+          "icon": "resources/icon.svg"
         }
       ]
     },
@@ -119,31 +119,31 @@
         },
         {
           "command": "csCallGraph.formatTree",
-          "when": "view == csCallGraph.callHierarchy && csCallGraph.copyFormatIsTree",
+          "when": "view == csCallGraph.callHierarchy && !csCallGraph.copyFormatIsTree",
           "group": "navigation"
         },
         {
           "command": "csCallGraph.formatJson",
-          "when": "view == csCallGraph.callHierarchy && !csCallGraph.copyFormatIsTree",
+          "when": "view == csCallGraph.callHierarchy && csCallGraph.copyFormatIsTree",
           "group": "navigation"
         }
       ],
       "commandPalette": [
         {
           "command": "csCallGraph.toggleDirection",
-          "when": "view == csCallGraph.callHierarchy"
+          "when": "focusedView == 'csCallGraph.callHierarchy'"
         },
         {
           "command": "csCallGraph.copyCallTree",
-          "when": "view == csCallGraph.callHierarchy"
+          "when": "focusedView == 'csCallGraph.callHierarchy'"
         },
         {
           "command": "csCallGraph.formatTree",
-          "when": "view == csCallGraph.callHierarchy && csCallGraph.copyFormatIsTree"
+          "when": "focusedView == 'csCallGraph.callHierarchy' && !csCallGraph.copyFormatIsTree"
         },
         {
           "command": "csCallGraph.formatJson",
-          "when": "view == csCallGraph.callHierarchy && !csCallGraph.copyFormatIsTree"
+          "when": "focusedView == 'csCallGraph.callHierarchy' && csCallGraph.copyFormatIsTree"
         },
         {
           "command": "csCallGraph.openLocation",

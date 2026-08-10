@@ -170,6 +170,29 @@ public class CallHierarchyHandlerTests
         Assert.NotEmpty(result.Roots);
     }
 
+    [Theory]
+    [InlineData("\"10\"")] // string
+    [InlineData("null")] // null
+    [InlineData("10.5")] // decimal
+    [InlineData("2147483648")] // above Int32.MaxValue
+    [InlineData("-2147483649")] // below Int32.MinValue
+    public void CallTree_InvalidMaxDepth_ReturnsInvalidParams(string maxDepthJson)
+    {
+        var msg = new JsonRpcMessage
+        {
+            Id = (JsonRpcId)5,
+            Params = JsonDocument.Parse(
+                $"{{\"symbol\":\"SampleLibrary.PublicMethods.StaticMethod(string)\",\"maxDepth\":{maxDepthJson}}}").RootElement,
+        };
+
+        var response = _fixture.Handler.Callees(msg);
+
+        Assert.NotNull(response);
+        Assert.NotNull(response.Error);
+        Assert.Equal(-32602, response.Error.Code);
+        Assert.Equal("Invalid maxDepth", response.Error.Message);
+    }
+
     private static JsonRpcMessage PrepareRequest(string uri, int line, int character) =>
         new()
         {

@@ -87,9 +87,11 @@ public class CallHierarchyHandler : IDisposable
         var symbol = symbolProp.GetString();
         if (symbol == null) return Error(msg.Id, -32602, "Missing symbol");
 
-        var maxDepth = msg.Params.Value.TryGetProperty("maxDepth", out var depthProp)
-            ? depthProp.GetInt32()
-            : 0;
+        var maxDepth = 0;
+        if (msg.Params.Value.TryGetProperty("maxDepth", out var depthProp)
+            && (depthProp.ValueKind != JsonValueKind.Number
+                || !depthProp.TryGetInt32(out maxDepth)))
+            return Error(msg.Id, -32602, "Invalid maxDepth");
 
         var result = direction == CallDirection.Callers
             ? _engine.GetCallersAsync(_solutionPath, symbol, maxDepth).GetAwaiter().GetResult()

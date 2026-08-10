@@ -101,7 +101,7 @@ Send-Lsp '{"jsonrpc":"2.0","id":6,"method":"csCallGraph/callees","params":{"symb
 Send-Lsp '{"jsonrpc":"2.0","id":7,"method":"csCallGraph/callers","params":{"symbol":"SampleLibrary.PublicMethods.StaticMethod(string)"}}'
 ```
 
-`symbol` is the fully qualified name — the `data` field of a `prepareCallHierarchy` item (e.g. `SampleConsoleApp.Callers.RunAll()` or `SampleLibrary.PublicMethods.StaticMethod(string)`). `maxDepth` is optional (0 = unlimited). The response is the full `CallGraphResult`: `target`, `direction` (0 = callers, 1 = callees), and nested `roots` with `symbol`, `callSites`, `callCount`, `children`.
+`symbol` is the fully qualified name — the `data` field of a `prepareCallHierarchy` item (e.g. `SampleConsoleApp.Callers.RunAll()` or `SampleLibrary.PublicMethods.StaticMethod(string)`). The trailing `()` is optional: `SampleConsoleApp.Callers.RunAll` and `SampleConsoleApp.Callers.RunAll()` are equivalent. `maxDepth` is optional (0 = unlimited). The response is the full `CallGraphResult`: `target`, `direction` (0 = callers, 1 = callees), and nested `roots` with `symbol`, `callSites`, `callCount`, `children`.
 
 ### Shutdown
 
