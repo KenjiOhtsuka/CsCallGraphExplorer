@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.1.2] - Beta
+
+- Fixed activity-bar icon (`resources/icon.svg` instead of an unsupported codicon).
+- Fixed sidebar buttons being hidden from the command palette (`focusedView` when-clauses).
+- Fixed Format: Tree / Format: JSON buttons showing the wrong copy format state.
+- Fixed node click opening the declaration instead of the call site.
+- Validate `maxDepth` input in the callers/callees LSP handlers (`-32602` on invalid values).
+
 ## [0.1.1] - Beta
 
 - Call-hierarchy exploration for C# using Roslyn: show callers and callees of any method in the solution.
