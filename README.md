@@ -1,21 +1,97 @@
 # CsCallGraphExplorer
 
-Call-hierarchy exploration for C# using Roslyn analysis. Discover who calls a method or what a method calls, across projects in a solution.
+> Call-hierarchy exploration for C#, powered by Roslyn. Discover **who calls a method** and **what a method calls** across every project in a solution.
+
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![.NET](https://img.shields.io/badge/.NET%2010-512BD4?logo=dotnet&logoColor=white)
+![Language](https://img.shields.io/badge/language-C%23-239120)
+![VS Code](https://img.shields.io/badge/VS%20Code-extension-007ACC?logo=visualstudiocode&logoColor=white)
+
+Two ways to explore your call graph:
+
+| | **CLI** (`CsCallGraph.Cli`) | **VS Code extension** (`cs-call-graph`) |
+|---|---|---|
+| Where | Terminal / scripts | Editor sidebar |
+| Query | `callers` / `callees` / `list-symbols` by symbol name | Right-click any C# method |
+| Output | Text tree or JSON | Interactive tree with click-through navigation |
+| Best for | CI checks, batch analysis, scripting | Day-to-day code exploration |
+
+## Features
+
+- **Roslyn-powered** — full static analysis of your solution (MSBuild workspace), not regex.
+- **Both directions** — callers, callees, or toggle between them.
+- **Tree or JSON output** — human-readable or machine-consumable.
+- **Depth limiting** — cap the tree (`--depth`, default 10; `0` = unlimited).
+- **Scope filtering** — `solution`, `project`, or `project-with-dependencies`.
+- **Extension niceties** — direction toggle, copy tree / JSON to clipboard, click call sites to jump to source, empty-state placeholders for bodyless symbols.
+
+## Quick start (CLI)
+
+```powershell
+dotnet run --project src\CsCallGraph.Cli -- callers --solution samples\SampleProject.sln --symbol "SampleLibrary.PublicMethods.StaticMethod"
+```
+
+```text
+Callers of StaticMethod
+├─ [M] CallStaticMethod (static)  —  1 call site(s)
+│    at samples\SampleConsoleApp\Callers.cs:38,23
+│  └─ [M] RunAll  —  1 call site(s)
+│       at samples\SampleConsoleApp\Callers.cs:15,9
+│     └─ [M] <top-level-statements-entry-point> (static)  —  1 call site(s)
+│          at samples\SampleConsoleApp\Program.cs:5,6
+├─ [M] ExtraCaller  —  1 call site(s)
+│    at samples\SampleConsoleApp\OtherCalls.cs:22,23
+└─ [M] InstanceMethod  —  1 call site(s)
+     at samples\SampleLibrary\PublicMethods.cs:7,9
+   ├─ [M] CallInstanceMethod  —  1 call site(s)
+   ...
+```
+
+## VS Code extension
+
+The repo also ships a VS Code extension (`extensions/vscode`, package name `cs-call-graph`).
+
+**Install**
+- From the Marketplace (publisher `KenjiOtsuka`), or
+- Build a `.vsix` locally: `cd extensions\vscode; npm install; npm run package` — then `code --install-extension cs-call-graph-<version>.vsix`.
+
+**Use**
+1. Open a folder that contains a `.sln` (auto-detected, or set `csCallGraph.solutionPath`).
+2. Place the cursor on a method, right-click → **CsCallGraph ▸ Show Callers** (or Show Callees).
+3. Explore the sidebar tree — toggle direction, copy the tree (tree/JSON), click a call site to jump to it.
+
+**Requirements:** VS Code `^1.96.0` and the **.NET 10 runtime** (the analysis server ships inside the VSIX but is not self-contained).
+
+Full extension docs, settings, and known limitations: [`extensions/vscode/README.md`](extensions/vscode/README.md).
 
 ## Requirements
 
-- .NET 10 SDK
+| Component | Requires |
+|---|---|
+| CLI + tests | .NET 10 SDK |
+| VS Code extension | VS Code `^1.96.0` + .NET 10 runtime |
 
-## Build & Test
+## Build & test
 
-```
+```powershell
 dotnet build CsCallGraphExplorer.sln
-dotnet test tests\CsCallGraph.Core.Tests
+dotnet test CsCallGraphExplorer.sln
 ```
 
-## Usage
+69 tests — 55 in `CsCallGraph.Core.Tests`, 14 in `CsCallGraph.LanguageServer.Tests`.
 
+For the extension:
+
+```powershell
+cd extensions\vscode
+npm install
+npm run compile     # or npm run watch
+npm run lint
 ```
+
+## Usage (CLI reference)
+
+```text
 cs-call-graph <command> [options]
 
 Commands:
@@ -41,59 +117,22 @@ Global options:
 dotnet run --project src\CsCallGraph.Cli -- list-symbols --solution samples\SampleProject.sln
 ```
 
-Output is one fully-qualified symbol name per line:
-```
+One fully-qualified symbol name per line:
+
+```text
 SampleLibrary.PublicMethods.InstanceMethod
 SampleLibrary.PublicMethods.StaticMethod
 SampleLibrary.Overloads.Compute
 SampleLibrary.GenericClass<TKey, TValue>.Add
 ```
 
-### Find callers
-
-```
-dotnet run --project src\CsCallGraph.Cli -- callers --solution samples\SampleProject.sln --symbol "SampleLibrary.PublicMethods.StaticMethod"
-```
-
-```
-Callers of StaticMethod
-├─ [M] CallStaticMethod (static)  —  1 call site(s)
-│    at samples\SampleConsoleApp\Callers.cs:38,23
-│  └─ [M] RunAll  —  1 call site(s)
-│       at samples\SampleConsoleApp\Callers.cs:15,9
-│     └─ [M] <top-level-statements-entry-point> (static)  —  1 call site(s)
-│          at samples\SampleConsoleApp\Program.cs:5,6
-├─ [M] ExtraCaller  —  1 call site(s)
-│    at samples\SampleConsoleApp\OtherCalls.cs:22,23
-└─ [M] InstanceMethod  —  1 call site(s)
-     at samples\SampleLibrary\PublicMethods.cs:7,9
-   ├─ [M] CallInstanceMethod  —  1 call site(s)
-   │    at samples\SampleConsoleApp\Callers.cs:33,18
-   │  └─ [M] RunAll  —  1 call site(s)
-   │       at samples\SampleConsoleApp\Callers.cs:14,9
-   │     └─ [M] <top-level-statements-entry-point> (static)  —  1 call site(s)
-   │          at samples\SampleConsoleApp\Program.cs:5,6
-   ├─ [M] Execute  —  1 call site(s)
-   │    at samples\SampleConsoleApp\OtherCalls.cs:11,17
-   │  └─ [M] <top-level-statements-entry-point> (static)  —  1 call site(s)
-   │       at samples\SampleConsoleApp\Program.cs:8,7
-   └─ [M] ExtraCaller  —  1 call site(s)
-        at samples\SampleConsoleApp\OtherCalls.cs:21,17
-```
-
-### Find callees
-
-```
-dotnet run --project src\CsCallGraph.Cli -- callees --solution samples\SampleProject.sln --symbol "SampleConsoleApp.Callers.RunAll"
-```
-
 ### Resolve symbol from source location
+
+Line and column are 1-based (matching editor display):
 
 ```
 dotnet run --project src\CsCallGraph.Cli -- callers --solution samples\SampleProject.sln --symbol-at samples\SampleConsoleApp\Callers.cs:38:23
 ```
-
-Line and column are 1-based (matching editor display).
 
 ### JSON output
 
@@ -163,6 +202,7 @@ Use fully qualified names as shown by `list-symbols`. Exact match only — no fu
 | `GenericMethods.Swap<>` | Generic method by arity |
 
 Constructors use `.ctor`:
+
 ```
 SampleLibrary.CtorsAndStatics..ctor
 SampleLibrary.CtorsAndStatics..ctor(string)
@@ -191,27 +231,30 @@ Errors are written to **stderr** as structured JSON:
 | `INTERNAL_ERROR` | Unexpected error | 2 |
 | Usage validation | Missing args, etc. | 3 |
 
-## Sample project
-
-The `samples/` directory contains `SampleLibrary` (library with various C# constructs: inheritance, generics, overloads, async, delegates, properties, constructors, statics, nested types) and `SampleConsoleApp` (exercises each feature).
-
-```
-dotnet run --project src\CsCallGraph.Cli -- list-symbols --solution samples\SampleProject.sln
-```
-
 ## Project structure
 
-```
-CsCallGraphExplorer.sln           — Tool solution (Core + CLI + tests)
+```text
+CsCallGraphExplorer.sln            Tool + extension workspace
 src/
-  CsCallGraph.Core/               — Analysis engine (Roslyn wrapping)
-  CsCallGraph.Cli/                — CLI frontend
+  CsCallGraph.Core/                Analysis engine (Roslyn wrapping)
+  CsCallGraph.Cli/                 CLI frontend
+  CsCallGraph.LanguageServer/      LSP server used by the VS Code extension
+extensions/
+  vscode/                          VS Code extension (cs-call-graph)
+    src/extension.ts               Extension host, LSP client, sidebar tree
+    server/                        Bundled analysis server (built artifact)
+    resources/icon.svg             Activity-bar icon
+    test/TESTING.md                Manual testing checklist
 samples/
-  SampleProject.sln               — Standalone sample solution
-  SampleLibrary/                  — C# library with constructs
-  SampleConsoleApp/               — Console app exercising the library
+  SampleProject.sln                Standalone sample solution
+  SampleLibrary/                   C# library with constructs
+  SampleConsoleApp/                Console app exercising the library
 tests/
-  CsCallGraph.Core.Tests/         — Unit tests (xUnit, 48 tests)
-  CsCallGraph.LanguageServer.Tests/ — LSP handler tests (xUnit, 4 tests)
-spec/                             — Design documents
+  CsCallGraph.Core.Tests/          Unit tests (xUnit, 55 tests)
+  CsCallGraph.LanguageServer.Tests/  LSP handler tests (xUnit, 14 tests)
+spec/                              Design documents
 ```
+
+## License
+
+[MIT](LICENSE)
