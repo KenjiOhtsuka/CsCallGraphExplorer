@@ -31,7 +31,7 @@ Two ways to explore your call graph:
 dotnet run --project src\CsCallGraph.Cli -- callers --solution samples\SampleProject.sln --symbol "SampleLibrary.PublicMethods.StaticMethod"
 ```
 
-```
+```text
 Callers of StaticMethod
 ├─ [M] CallStaticMethod (static)  —  1 call site(s)
 │    at samples\SampleConsoleApp\Callers.cs:38,23
@@ -91,7 +91,7 @@ npm run lint
 
 ## Usage (CLI reference)
 
-```
+```text
 cs-call-graph <command> [options]
 
 Commands:
@@ -119,7 +119,7 @@ dotnet run --project src\CsCallGraph.Cli -- list-symbols --solution samples\Samp
 
 One fully-qualified symbol name per line:
 
-```
+```text
 SampleLibrary.PublicMethods.InstanceMethod
 SampleLibrary.PublicMethods.StaticMethod
 SampleLibrary.Overloads.Compute
@@ -233,7 +233,7 @@ Errors are written to **stderr** as structured JSON:
 
 ## Project structure
 
-```
+```text
 CsCallGraphExplorer.sln            Tool + extension workspace
 src/
   CsCallGraph.Core/                Analysis engine (Roslyn wrapping)
